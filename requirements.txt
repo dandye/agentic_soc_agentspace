@@ -1,0 +1,5 @@
+google-cloud-aiplatform[adk,agent_engines]>=1.56.0
+google-adk
+fastapi
+uvicorn
+python-dotenv
