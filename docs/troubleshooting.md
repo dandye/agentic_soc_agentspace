@@ -1,11 +1,11 @@
 ---
 title: Troubleshooting Guide
-description: Solutions for common issues with Google MCP Security Agent
+description: Solutions for common deployment and operation issues
 ---
 
 # Troubleshooting Guide
 
-This guide covers common issues and their solutions when deploying and operating the Google MCP Security Agent.
+Common issues and solutions for MCP agent deployment and operation.
 
 ## Deployment Issues
 
@@ -298,6 +298,3 @@ If you encounter issues not covered here:
    - Implement gradual rollouts
    - Maintain rollback procedures
 
----
-
-*Last updated: November 2024*

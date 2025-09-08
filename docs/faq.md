@@ -1,6 +1,6 @@
 ---
 title: Frequently Asked Questions
-description: Common questions about Google MCP Security Agent
+description: Common questions about MCP agent deployment
 ---
 
 # Frequently Asked Questions
@@ -9,11 +9,11 @@ description: Common questions about Google MCP Security Agent
 
 ### What is the Google MCP Security Agent?
 
-The Google MCP Security Agent is an AI-powered security operations platform that combines:
-- Vertex AI's reasoning capabilities
-- Pre-built integrations with Google Security products (Chronicle, SOAR, SCC)
-- A user-friendly interface through AgentSpace
-- Automated incident response workflows
+An agent deployed to Vertex AI Agent Engine that:
+- Uses MCP protocol to connect to security tools
+- Integrates with Google Security products (Chronicle, SOAR, SCC)
+- Can be accessed through AgentSpace UI
+- Supports automated workflows via SOAR
 
 ### What are the prerequisites?
 
@@ -30,23 +30,20 @@ Costs depend on usage:
 - **Storage**: Minimal costs for staging bucket
 - **Security Products**: Separate licensing (Chronicle, SOAR)
 
-Typical monthly cost for moderate usage: $100-500
+### What is the current status?
 
-### Is this production-ready?
-
-Yes, with considerations:
-- The Agent Engine is GA (Generally Available)
+- Agent Engine is GA (Generally Available)
 - AgentSpace is in Preview (v1alpha)
 - MCP tools are community-maintained
-- Recommended to start with non-critical workflows
+- Consider starting with non-critical workflows
 
 ## Setup Questions
 
 ### How long does setup take?
 
-- **Basic deployment**: 10-15 minutes
-- **Full configuration with integrations**: 1-2 hours
-- **Production-ready setup**: 1-2 days
+- Basic deployment: 10-15 minutes
+- Full configuration with integrations: 1-2 hours
+- Production setup: 1-2 days
 
 ### Can I use this without SOAR?
 
@@ -159,9 +156,9 @@ gsutil cp .env gs://your-backup-bucket/
 
 ## Security Questions
 
-### Is this secure for production use?
+### What security considerations apply?
 
-With proper configuration, yes:
+Key security points:
 - Enable all security features
 - Use least-privilege IAM
 - Implement network restrictions
@@ -277,6 +274,3 @@ gcloud projects get-iam-policy ${PROJECT_ID} \
 - Security Operations courses
 - Custom training available
 
----
-
-*Last updated: November 2024*

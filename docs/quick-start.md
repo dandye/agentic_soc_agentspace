@@ -1,11 +1,11 @@
 ---
 title: Quick Start Guide
-description: Get your Google MCP Security Agent running in minutes
+description: Steps to deploy MCP security agents to Google Cloud
 ---
 
 # Quick Start Guide
 
-This guide will walk you through deploying a Google MCP Security Agent to Agent Engine and then connecting it to AgentSpace for a complete AI-powered security operations solution.
+Steps for deploying an MCP Security Agent to Agent Engine and connecting it to AgentSpace.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ Before you begin, ensure you have:
   - Security Command Center API (if using SCC tools)
   - Chronicle API (if using SecOps tools)
 
-## Part 1: Speed Run - Agent Engine Deployment
+## Part 1: Agent Engine Deployment
 
 ### Step 1: Clone and Setup
 

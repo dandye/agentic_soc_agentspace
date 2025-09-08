@@ -1,27 +1,26 @@
 ---
 title: Google Cloud Security MCP Agent Documentation
-description: AI-powered security operations with Google Cloud
+description: Deployment guide for MCP security agents on Google Cloud
 ---
 
 # Google MCP Security Agent
 
-An enterprise-grade AI agent for security operations, integrating Google Cloud Security's MCP (Model Context Protocol) tools with Vertex AI Agent Engine and AgentSpace.
+Documentation for deploying MCP security agents to Vertex AI Agent Engine and AgentSpace.
 
 ## What is this?
 
-The Google Cloud Security MCP Tool Agent combines:
-- **Vertex AI Agent Engine**: Google's platform for deploying AI agents
-- **MCP Security Tools**: Pre-built integrations with Google Security products
-- **AgentSpace**: User-friendly interface for interacting with agents
-- **SOAR Integration**: Automated security orchestration and response
+This repository documents the steps needed to:
+- Deploy an agent with MCP security tools to Vertex AI Agent Engine
+- Connect the deployed agent to AgentSpace for UI access
+- Configure OAuth authentication for secure API access
+- Integrate with Google Security products (Chronicle, SOAR, SCC)
 
-## Key Features
+## Components
 
-- **Quick Deployment**: Get running in under 10 minutes
-- **Enterprise Security**: Integration with Chronicle, Security Command Center, and Threat Intelligence
-- **AI-Powered Analysis**: Leverage Google's latest AI models for security operations
-- **Extensible**: Add custom tools and workflows
-- **AgentSpace UI**: Professional interface for security teams
+- **Vertex AI Agent Engine**: Deployment target for the agent
+- **MCP Security Tools**: Security product integrations via Model Context Protocol
+- **AgentSpace**: UI for interacting with deployed agents
+- **SOAR Integration**: Connection to Security Operations SOAR platform
 
 ## Documentation
 
@@ -121,14 +120,3 @@ make full-deploy-with-oauth
 | SOAR | Latest | Supported |
 | Security Command Center | v1 | Supported |
 
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](./contributing.md) for details.
-
-## License
-
-This project is licensed under the Apache License 2.0. See [LICENSE](../LICENSE) for details.
-
----
-
-*Last updated: November 2024*

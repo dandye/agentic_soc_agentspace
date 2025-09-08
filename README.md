@@ -1,19 +1,10 @@
 # Google Cloud AI Agent with MCP Security Tools
 
-A Google Vertex AI Agent Engine application that integrates with Google's Model Context Protocol (MCP) security tools for advanced security operations and threat intelligence workflows.
+Deployment code and documentation for running MCP security agents on Google Vertex AI Agent Engine.
 
 ## Overview
 
-This project demonstrates how to create and deploy AI agents on Google Cloud that have access to enterprise security tools through the Model Context Protocol. The agents can interact with Google Security Operations (Chronicle), SOAR platforms, Google Threat Intelligence, and Security Command Center to assist with security analysis, incident response, and threat hunting.
-
-## Features
-
-- **AI-Powered Security Operations**: Deploy intelligent agents with access to Google's security toolchain
-- **MCP Integration**: Seamless integration with Google's MCP security servers
-- **Multi-Tool Access**: Agents can use Chronicle, SOAR, GTI, and Security Command Center simultaneously
-- **Cloud-Native Deployment**: Fully managed deployment on Google Cloud Agent Engines
-- **Session Management**: Support for multi-user sessions and streaming responses
-- **Extensible Architecture**: Easy integration of additional MCP tools and security services
+This repository contains the code needed to deploy AI agents with MCP security tool access to Google Cloud. The agents can interact with Google Security Operations (Chronicle), SOAR platforms, Google Threat Intelligence, and Security Command Center through the Model Context Protocol.
 
 ## Architecture
 
@@ -22,7 +13,7 @@ This project demonstrates how to create and deploy AI agents on Google Cloud tha
 │   main.py       │───▶│  Vertex AI       │───▶│   MCP Security      │
 │   Agent Creator │    │  Agent Engine    │    │   Tools (stdio)     │
 └─────────────────┘    └──────────────────┘    └─────────────────────┘
-                                │                        │
+                               │                        │
 ┌─────────────────┐            │                ┌───────▼───────┐
 │test_agent_engine│◀───────────┘                │ • Chronicle   │
 │    Testing      │                             │ • SOAR        │
@@ -91,12 +82,21 @@ This project demonstrates how to create and deploy AI agents on Google Cloud tha
 
 ## Usage
 
-### Deploying a New Agent
-
-Create and deploy a new AI agent with security tools:
+### Quick Start
 
 ```bash
-python main.py
+# Setup and deploy
+make setup
+make full-deploy
+
+# Or with OAuth
+make full-deploy-with-oauth
+```
+
+### Deploying a New Agent
+
+```bash
+make deploy
 ```
 
 This will:
@@ -107,23 +107,11 @@ This will:
 
 ### Testing an Existing Agent
 
-Test a previously deployed agent:
-
 ```bash
-python test_agent_engine.py
+make test
 ```
 
-This connects to an existing agent using the `REASONING_ENGINE` ID from your environment and allows you to send queries.
-
-### Example Interactions
-
-Once your agent is deployed, you can interact with it through the testing script. Example queries:
-
-- "List the available MCP tools"
-- "Search Chronicle for IOCs related to suspicious domain activity"
-- "Get SOAR cases from the last 24 hours"
-- "Query Google Threat Intelligence for domain reputation"
-- "List Security Command Center findings for my project"
+This connects to an existing agent using the `REASONING_ENGINE` ID from your environment.
 
 ## MCP Security Tools
 
@@ -194,23 +182,8 @@ Monitor agent performance in Google Cloud Console:
 - Navigate to Vertex AI → Agent Builder → Your Agent
 - Check logs in Cloud Logging for detailed error information
 
-## Contributing
+## See Also
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Acknowledgments
-
-- [Google MCP Security](https://github.com/google/mcp-security) for the security tool integrations
-- [Model Context Protocol](https://modelcontextprotocol.io/) for the tool interaction standard
-- Google Cloud Vertex AI team for the Agent Engine platform
-
-## Support
-
-For questions and support:
-- Create an issue in this repository
-- Check the [Google MCP Security documentation](https://google.github.io/mcp-security/)
-- Review Google Cloud Vertex AI Agent documentation
+- [Google MCP Security](https://github.com/google/mcp-security) - MCP security tool implementations
+- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP specification
+- [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs) - Google Cloud AI platform documentation
