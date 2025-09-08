@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
@@ -67,7 +68,9 @@ remote_app = agent_engines.create(
   ],
 )
 
-
+#
+# Test agent
+#
 async def async_test(remote_app):
   session = await remote_app.async_create_session(user_id="D")
   print(f"session: {session}")
@@ -81,4 +84,12 @@ async def async_test(remote_app):
 
 asyncio.run(async_test(remote_app))
 
-#remote_app.delete(force=True)
+#
+# Delete agent if --delete flag is passed
+#
+if "--delete" in sys.argv:
+    print("\nDeleting agent...")
+    remote_app.delete(force=True)
+    print("Agent deleted successfully")
+else:
+    print(f"\nAgent deployed: {remote_app.resource_name}")
