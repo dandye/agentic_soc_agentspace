@@ -3,3 +3,5 @@ google-adk
 fastapi
 uvicorn
 python-dotenv
+google-auth-oauthlib
+typer

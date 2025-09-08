@@ -52,7 +52,7 @@ vertexai.init(
 )
 
 remote_app = agent_engines.create(
-  display_name="Agent with soar rel path",
+  display_name="SOC Agent",
   description="Simple agent plus google search tool.",
   build_options = {"installation_scripts": ["installation_scripts/install.sh"]},
   extra_packages=["mcp-security/server", "installation_scripts/install.sh"],
@@ -81,4 +81,4 @@ async def async_test(remote_app):
 
 asyncio.run(async_test(remote_app))
 
-remote_app.delete(force=True)
+#remote_app.delete(force=True)
