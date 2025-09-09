@@ -12,11 +12,36 @@ from vertexai import agent_engines
 
 load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"))
 
-LOCATION = os.environ['LOCATION']
-PROJECT = os.environ['PROJECT_ID']
-PROJECT_NUMBER = os.environ['PROJECT_NUMBER']
-SOAR_URL = os.environ['SOAR_URL']
-SOAR_APP_KEY = os.environ['SOAR_APP_KEY']
+CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]
+CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]
+CHRONICLE_REGION = os.environ["CHRONICLE_CUSTOMER_ID"]
+LOCATION = os.environ["LOCATION"]
+PROJECT_ID = os.environ["PROJECT_ID"]
+PROJECT_NUMBER = os.environ["PROJECT_NUMBER"]
+SOAR_URL = os.environ["SOAR_URL"]
+SOAR_APP_KEY = os.environ["SOAR_APP_KEY"]
+STAGING_BUCKET = os.environ["STAGING_BUCKET"]
+VT_APIKEY = os.environ["VT_APIKEY"]
+
+secops_siem_tools = MCPToolset(
+    connection_params=StdioConnectionParams(
+      server_params=StdioServerParameters(
+        command='uv',
+        args=[ "--directory",
+                "./mcp-security/server/secops/secops_mcp",
+                "run",
+                "server.py",
+        ],
+        env = {
+        "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
+        "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
+        "CHRONICLE_REGION": CHRONICLE_REGION,
+      }
+    ),
+    timeout=60
+  ),
+  errlog=None
+)
 
 secops_soar_tools = MCPToolset(
     connection_params=StdioConnectionParams(
@@ -32,9 +57,43 @@ secops_soar_tools = MCPToolset(
           "SOAR_APP_KEY": SOAR_APP_KEY
        },
     ),
-    timeout=60000
+    timeout=60
   ),
   #tool_set_name="secops_soar_mcp",
+  errlog=None
+)
+
+gti_tools = MCPToolset(
+    connection_params=StdioConnectionParams(
+      server_params=StdioServerParameters(
+        command='uv',
+        args=[ "--directory",
+                "./mcp-security/server/gti/gti_mcp",
+                "run",
+                "server.py",
+        ],
+        env = {
+          "VT_APIKEY": VT_APIKEY,
+      }
+    ),
+    timeout=60
+  ),
+  errlog=None
+)
+
+scc_tools = MCPToolset(
+    connection_params=StdioConnectionParams(
+      server_params=StdioServerParameters(
+        command='uv',
+        args=[ "--directory",
+                "./mcp-security/server/scc",
+                "run",
+                "scc_mcp.py",
+        ],
+        env = {},
+    ),
+    timeout=600
+  ),
   errlog=None
 )
 
@@ -43,13 +102,18 @@ root_agent = Agent(
   name="root_assistant",
   description="Security Operations reasoning agent with access to SOAR tools.",
   instruction="Use the available MCP tools and reasoning to fulfil user requests.",
-  tools=[secops_soar_tools] # 'message': 'Multiple tools are supported only when they are all search tools.', 'status': 'INVALID_ARGUMENT'}}
+  tools=[
+     secops_soar_tools,
+     secops_siem_tools,
+     gti_tools,
+     scc_tools,
+  ]
 )
 
 vertexai.init(
-    project=os.environ['PROJECT_ID'],
-    location=os.environ['LOCATION'],
-    staging_bucket=os.environ['STAGING_BUCKET'],
+    project=PROJECT_ID,
+    location=LOCATION,
+    staging_bucket=STAGING_BUCKET,
 )
 
 remote_app = agent_engines.create(
