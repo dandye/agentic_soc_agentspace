@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from google.adk.tools import VertexAiSearchTool
 from mcp import StdioServerParameters
 import vertexai
 from vertexai import agent_engines
@@ -15,6 +16,7 @@ load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"))
 CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]
 CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]
 CHRONICLE_REGION = os.environ["CHRONICLE_CUSTOMER_ID"]
+DATASTORE_PATH = os.environ["DATASTORE_PATH"]
 LOCATION = os.environ["LOCATION"]
 PROJECT_ID = os.environ["PROJECT_ID"]
 PROJECT_NUMBER = os.environ["PROJECT_NUMBER"]
@@ -97,6 +99,20 @@ scc_tools = MCPToolset(
   errlog=None
 )
 
+# Tool Instantiation
+# You MUST provide your datastore ID here.
+vertex_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_PATH)
+
+vertex_search_agent = Agent(
+  model="gemini-2.5-flash",
+  name="vertex_search_agent",
+  description="Security Operations reasoning agent with search access to AI Runboks in gDrive.",
+  instruction="Use the available Runbooks in gDrive to fulfil user requests.",
+  tools=[
+     vertex_search_tool,
+  ]
+)
+
 root_agent = Agent(
   model="gemini-2.5-flash",
   name="root_assistant",
@@ -107,7 +123,8 @@ root_agent = Agent(
      secops_siem_tools,
      gti_tools,
      scc_tools,
-  ]
+  ],
+  sub_agents=[vertex_search_agent]
 )
 
 vertexai.init(
