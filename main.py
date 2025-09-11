@@ -1,6 +1,8 @@
 import asyncio
 import os
 import sys
+from pathlib import Path
+import shutil
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
@@ -11,11 +13,11 @@ from mcp import StdioServerParameters
 import vertexai
 from vertexai import agent_engines
 
-load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"))
+load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"), override=True)
 
 CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]
 CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]
-CHRONICLE_REGION = os.environ["CHRONICLE_CUSTOMER_ID"]
+CHRONICLE_REGION = os.environ["CHRONICLE_REGION"]
 DATASTORE_PATH = os.environ["DATASTORE_PATH"]
 LOCATION = os.environ["LOCATION"]
 PROJECT_ID = os.environ["PROJECT_ID"]
@@ -24,20 +26,28 @@ SOAR_URL = os.environ["SOAR_URL"]
 SOAR_APP_KEY = os.environ["SOAR_APP_KEY"]
 STAGING_BUCKET = os.environ["STAGING_BUCKET"]
 VT_APIKEY = os.environ["VT_APIKEY"]
+SECOPS_SA_PATH = os.environ["SECOPS_SA_PATH"]
+
+
+service_account_path = Path(SECOPS_SA_PATH)
+_ = service_account_path.parent
+service_account_filename = service_account_path.name
 
 secops_siem_tools = MCPToolset(
-    connection_params=StdioConnectionParams(
-      server_params=StdioServerParameters(
-        command='uv',
-        args=[ "--directory",
-                "./mcp-security/server/secops/secops_mcp",
-                "run",
-                "server.py",
-        ],
-        env = {
+  connection_params=StdioConnectionParams(
+    server_params=StdioServerParameters(
+      command='uv',
+      args=[ "--directory",
+              "./mcp-security/server/secops/secops_mcp",
+              "run",
+              "server.py",
+      ],
+      env = {
         "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
         "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
         "CHRONICLE_REGION": CHRONICLE_REGION,
+         # packged app will expect this in same dir as server.py
+        "SECOPS_SA_PATH": service_account_filename
       }
     ),
     timeout=60
@@ -133,11 +143,17 @@ vertexai.init(
     staging_bucket=STAGING_BUCKET,
 )
 
+# copy the JSON SA file to the same dir as server.py
+shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/secops/secops_mcp/")
+
 remote_app = agent_engines.create(
-  display_name="SOC Agent",
-  description="Simple agent plus google search tool.",
+  display_name="Agentic SOC Agent Engine",
+  description="Instance of Agent Engine for the Agentic SOC.",
   build_options = {"installation_scripts": ["installation_scripts/install.sh"]},
-  extra_packages=["mcp-security/server", "installation_scripts/install.sh"],
+  extra_packages=[
+     "mcp-security/server",
+     "installation_scripts/install.sh",
+  ],
   agent_engine=root_agent,
   requirements=[
     "cloudpickle==3.1.1",
@@ -158,7 +174,10 @@ async def async_test(remote_app):
   async for event in remote_app.async_stream_query(
     user_id="D",
     session_id=session.get("id"),
-    message="List the MCP Tools and then use the list_cases tool to get SOAR Cases.",
+    message="List the MCP Tools and then use the search_security_rules tool to find rules with ursnif in the name. "
+      #f" My `project_id is {CHRONICLE_PROJECT_ID} and "
+      #f" my customer_id is {CHRONICLE_CUSTOMER_ID} and "
+      #f" my region is {CHRONICLE_REGION}.",
   ):
     print(f"event: {event}")
   print("after query stream")
