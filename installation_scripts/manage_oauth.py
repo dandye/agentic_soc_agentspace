@@ -18,6 +18,7 @@ import google_auth_oauthlib.flow
 import requests
 import typer
 from typing_extensions import Annotated
+from dotenv import load_dotenv
 
 app = typer.Typer(
     add_completion=False,
@@ -42,18 +43,14 @@ class OAuthManager:
         self.creds, self.project = google.auth.default()
 
     def _load_env_vars(self) -> Dict[str, str]:
-        """Load environment variables from the .env file."""
-        env_vars = {}
+        """Load environment variables from the .env file using python-dotenv."""
+        # Load .env file into environment
         if self.env_file.exists():
-            with open(self.env_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        env_vars[key.strip()] = value.strip().strip('"\'')
+            load_dotenv(self.env_file, override=True)
         
-        # Also include OS environment variables
-        env_vars.update(os.environ)
+        # Get all environment variables (includes both .env and system env vars)
+        # dotenv handles quotes, comments, and spaces properly
+        env_vars = dict(os.environ)
         return env_vars
     
     def _update_env_var(self, key: str, value: str) -> None:
