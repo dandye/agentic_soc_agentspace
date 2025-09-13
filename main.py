@@ -116,7 +116,7 @@ vertex_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_PATH)
 vertex_search_agent = Agent(
   model="gemini-2.5-flash",
   name="vertex_search_agent",
-  description="Security Operations reasoning agent with search access to AI Runboks in gDrive.",
+  description="Security Operations reasoning agent with search access to AI Runbooks in gDrive.",
   instruction="Use the available Runbooks in gDrive to fulfil user requests.",
   tools=[
      vertex_search_tool,

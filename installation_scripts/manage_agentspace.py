@@ -591,7 +591,6 @@ class AgentSpaceManager:
         Returns:
             True if successful, False otherwise
         """
-        import pdb; pdb.set_trace()
         project_number = self.env_vars.get("AGENTSPACE_PROJECT_NUMBER")
         if not project_number:
             typer.echo("Error: AGENTSPACE_PROJECT_NUMBER not found in environment", err=True)
