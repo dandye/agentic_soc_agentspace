@@ -116,8 +116,27 @@ vertex_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_PATH)
 vertex_search_agent = Agent(
   model="gemini-2.5-flash",
   name="vertex_search_agent",
-  description="Security Operations reasoning agent with search access to AI Runbooks in gDrive.",
-  instruction="Use the available Runbooks in gDrive to fulfil user requests.",
+  description="Specialized agent for searching Security Operations runbooks, procedures, and documentation stored in Google Drive.",
+  instruction="""You are a specialized documentation search agent for Security Operations.
+
+YOUR ROLE:
+- Search through Security Operations runbooks, procedures, and guidelines in Google Drive
+- Find relevant step-by-step instructions, best practices, and documented procedures
+- Extract specific guidance for security workflows and incident response
+
+SEARCH STRATEGY:
+1. Use specific keywords related to the user's security question
+2. Look for procedures, runbooks, and guidelines that match the request
+3. Provide detailed excerpts from relevant documentation
+4. Include document names/sources when possible
+
+RETURN PROTOCOL:
+- Always provide your findings in a structured format
+- Include relevant quotes and specific steps from the documentation
+- If no exact match found, suggest related procedures or general guidance
+- End with "Search complete - returning to root agent for additional security tool integration"
+
+Focus on finding actionable documentation that the root agent can combine with live security data.""",
   tools=[
      vertex_search_tool,
   ]
@@ -127,7 +146,19 @@ root_agent = Agent(
   model="gemini-2.5-flash",
   name="root_assistant",
   description="Security Operations reasoning agent with access to SOAR tools.",
-  instruction="Use the available MCP tools and reasoning to fulfil user requests.",
+  instruction="""You are a Security Operations assistant with access to MCP security tools and a specialized sub-agent for runbook searches.
+
+DELEGATION RULES:
+- When users ask about runbooks, procedures, guidelines, or need to search documentation, delegate to the vertex_search_agent
+- When users ask for Chronicle/SIEM queries, threat intelligence, SOAR cases, or SCC findings, handle directly with your MCP tools
+- After delegation, review the sub-agent's response and provide additional context or follow-up actions using your security tools if needed
+
+COMMUNICATION PATTERN:
+1. If the request involves searching runbooks/procedures: "I'll search our runbooks for that information" → delegate to vertex_search_agent
+2. Review sub-agent results and enhance with relevant security tool actions
+3. Provide comprehensive response combining runbook guidance with live security data
+
+Use your MCP tools for real-time security operations and delegate documentation searches to ensure complete responses.""",
   tools=[
      secops_soar_tools,
      secops_siem_tools,
@@ -174,7 +205,7 @@ async def async_test(remote_app):
   async for event in remote_app.async_stream_query(
     user_id="D",
     session_id=session.get("id"),
-    message="List the MCP Tools and then use the search_security_rules tool to find rules with ursnif in the name. "
+    message="I need to investigate a potential malware incident. Please search our runbooks for incident response procedures for malware analysis, then use Chronicle to search for any recent ursnif-related security rules or detections."
       #f" My `project_id is {CHRONICLE_PROJECT_ID} and "
       #f" my customer_id is {CHRONICLE_CUSTOMER_ID} and "
       #f" my region is {CHRONICLE_REGION}.",
