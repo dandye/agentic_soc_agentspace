@@ -1,3 +1,4 @@
 [submodule "mcp-security"]
 	path = mcp-security
-	url = git@github.com:google/mcp-security.git
+	# url = git@github.com:google/mcp-security.git
+	url = https://github.com/google/mcp-security.git

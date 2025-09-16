@@ -15,6 +15,7 @@ import google.auth
 from google.auth.transport import requests as google_requests
 import requests
 import typer
+from dotenv import load_dotenv
 from typing_extensions import Annotated
 
 app = typer.Typer(
@@ -40,30 +41,26 @@ class AgentSpaceManager:
         self.creds, self.project = google.auth.default()
 
     def _load_env_vars(self) -> Dict[str, str]:
-        """Load environment variables from the .env file."""
-        env_vars = {}
+        """Load environment variables from the .env file using python-dotenv."""
+        # Load .env file into environment
         if self.env_file.exists():
-            with open(self.env_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        env_vars[key.strip()] = value.strip().strip('"\'')
-        
-        # Also include OS environment variables
-        env_vars.update(os.environ)
+            load_dotenv(self.env_file, override=True)
+
+        # Get all environment variables (includes both .env and system env vars)
+        # dotenv handles quotes, comments, and spaces properly
+        env_vars = dict(os.environ)
         return env_vars
-    
+
     def _update_env_var(self, key: str, value: str) -> None:
         """Update an environment variable in the .env file."""
         if not self.env_file.exists():
             self.env_file.touch()
-        
+
         lines = []
         if self.env_file.exists():
             with open(self.env_file, 'r') as f:
                 lines = f.readlines()
-        
+
         # Find existing key or add new one
         key_found = False
         for i, line in enumerate(lines):
@@ -73,13 +70,13 @@ class AgentSpaceManager:
                     lines[i] = f"{key}={value}\n"
                     key_found = True
                     break
-        
+
         if not key_found:
             lines.append(f"{key}={value}\n")
-        
+
         with open(self.env_file, 'w') as f:
             f.writelines(lines)
-        
+
         # Update in-memory env_vars
         self.env_vars[key] = value
 
@@ -285,28 +282,28 @@ class AgentSpaceManager:
         project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
-        
+
         # Check if engine has data stores
         engine_url = (
             f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
             f"locations/global/collections/{collection}/engines/{app_id}"
         )
-        
+
         response = self._make_request("GET", engine_url)
         if not response:
             typer.secho(" Failed to get engine details", fg=typer.colors.RED)
             return False
-            
+
         engine_data = response.json()
         data_store_ids = engine_data.get("dataStoreIds", [])
-        
+
         typer.echo(f"  Engine info: {engine_data.get('name', 'unknown')}")
         typer.echo(f"  Display name: {engine_data.get('displayName', 'N/A')}")
         typer.echo(f"  Data stores: {data_store_ids}")
-        
+
         if data_store_ids:
             typer.echo(f"  Engine has {len(data_store_ids)} data store(s) configured: {', '.join(data_store_ids)}")
-            
+
             # Verify each data store exists
             for ds_id in data_store_ids:
                 ds_url = (
@@ -319,73 +316,73 @@ class AgentSpaceManager:
                     typer.echo(f"    - {ds_id}: {ds_data.get('displayName', 'exists')}")
                 else:
                     typer.echo(f"    - {ds_id}: NOT FOUND")
-            
+
             # If we have at least one data store, we can use it for search
             # Engines with a single data store cannot add or remove data stores
             typer.secho("  Using existing data store(s) for search", fg=typer.colors.GREEN)
             return True
-        
+
         typer.secho(" No data stores found. Creating unstructured data store...", fg=typer.colors.YELLOW)
         return self._create_website_datastore()
-    
+
     def _create_website_datastore(self) -> bool:
         """Create an unstructured data store for search."""
         project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
-        
+
         # Create an unstructured data store
         data_store_id = f"{app_id}_unstructured_datastore"
         data_store_url = (
             f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
             f"locations/global/collections/{collection}/dataStores"
         )
-        
+
         data_store_config = {
             "displayName": "Unstructured Data Store for SOC Agent",
             "industryVertical": "GENERIC",
             "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
             "contentConfig": "CONTENT_REQUIRED"
         }
-        
+
         # Create the data store
         create_response = self._make_request(
-            "POST", 
+            "POST",
             data_store_url,
             json=data_store_config,
             params={"dataStoreId": data_store_id}
         )
-        
+
         if not create_response:
             # Check if it already exists (409 error)
             typer.echo(f"  Data store may already exist, attempting to link: {data_store_id}")
         else:
             typer.echo(f"  Created data store: {data_store_id}")
-        
+
         # Link data store to engine using PATCH
         typer.echo("  Linking data store to engine...")
         engine_url = (
             f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
             f"locations/global/collections/{collection}/engines/{app_id}"
         )
-        
+
         # Get existing data stores
         engine_response = self._make_request("GET", engine_url)
         existing_ids = []
         if engine_response:
             engine_data = engine_response.json()
             existing_ids = engine_data.get("dataStoreIds", [])
-        
+
         # Add new data store to existing ones
         all_data_stores = list(set(existing_ids + [data_store_id]))
-        
+
         # Update engine with new data store list using PATCH
         update_config = {
             "dataStoreIds": all_data_stores
         }
-        
+
         patch_response = self._make_request(
-            "PATCH", 
+            "PATCH",
             engine_url,
             json=update_config,
             params={"updateMask": "dataStoreIds"}
@@ -406,13 +403,13 @@ class AgentSpaceManager:
     ) -> bool:
         """
         Link an existing agent engine to AgentSpace with OAuth authorization.
-        
+
         Args:
             display_name: Display name for the agent in AgentSpace
             description: Description of the agent
             tool_description: Description of what the agent tool does
             auth_id: OAuth authorization ID
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -423,7 +420,7 @@ class AgentSpaceManager:
                 err=True,
             )
             return False
-        
+
         # Get values from environment if not provided
         if not display_name:
             display_name = self.env_vars.get("AGENT_DISPLAY_NAME", "MCP Security Agent")
@@ -439,24 +436,24 @@ class AgentSpaceManager:
             )
         if not auth_id:
             auth_id = self.env_vars.get("OAUTH_AUTH_ID")
-        
+
         project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
         as_app = self.env_vars["AGENTSPACE_APP_ID"]
         reasoning_engine = self.env_vars["AGENT_ENGINE_RESOURCE_NAME"]
-        
+
         access_token = self._get_access_token()
         if not access_token:
             typer.echo("Error: Failed to get access token", err=True)
             return False
-        
+
         url = f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/locations/global/collections/default_collection/engines/{as_app}/assistants/default_assistant/agents"
-        
+
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "X-Goog-User-Project": project_number,
         }
-        
+
         data = {
             "displayName": display_name,
             "description": description,
@@ -469,37 +466,37 @@ class AgentSpaceManager:
                 }
             }
         }
-        
+
         # Add authorization if provided
         if auth_id:
             data["adk_agent_definition"]["authorizations"] = [
                 f"projects/{project_number}/locations/global/authorizations/{auth_id}"
             ]
-        
+
         try:
             response = requests.post(url, headers=headers, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
             agent_name = result.get("name", "")
-            
+
             typer.echo(f"Successfully linked agent to AgentSpace!")
             typer.echo(f"Agent name: {agent_name}")
-            
+
             # Extract and save agent ID if present
             if "/" in agent_name:
                 agent_id = agent_name.split("/")[-1]
                 self._update_env_var("AGENTSPACE_AGENT_ID", agent_id)
                 typer.echo(f"Agent ID saved to environment: {agent_id}")
-            
+
             return True
-            
+
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error linking agent to AgentSpace: {e}", err=True)
             if hasattr(e.response, 'text'):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
-    
+
     def update_agent_config(
         self,
         agent_id: Optional[str] = None,
@@ -509,13 +506,13 @@ class AgentSpaceManager:
     ) -> bool:
         """
         Update an existing agent's configuration in AgentSpace.
-        
+
         Args:
             agent_id: ID of the agent to update
             display_name: New display name for the agent
             description: New description of the agent
             tool_description: New description of what the agent tool does
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -524,42 +521,42 @@ class AgentSpaceManager:
             if not agent_id:
                 typer.echo("Error: No agent ID provided or found in environment", err=True)
                 return False
-        
+
         project_number = self.env_vars.get("AGENTSPACE_PROJECT_NUMBER")
         if not project_number:
             typer.echo("Error: AGENTSPACE_PROJECT_NUMBER not found in environment", err=True)
             return False
-        
+
         as_app = self.env_vars.get("AGENTSPACE_APP_ID")
         if not as_app:
             typer.echo("Error: AGENTSPACE_APP_ID not found in environment", err=True)
             return False
-        
+
         access_token = self._get_access_token()
         if not access_token:
             typer.echo("Error: Failed to get access token", err=True)
             return False
-        
+
         url = f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/locations/global/collections/default_collection/engines/{as_app}/assistants/default_assistant/agents/{agent_id}"
-        
+
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
             "X-Goog-User-Project": project_number,
         }
-        
+
         # Build update mask and data
         update_mask = []
         data = {}
-        
+
         if display_name:
             data["displayName"] = display_name
             update_mask.append("displayName")
-        
+
         if description:
             data["description"] = description
             update_mask.append("description")
-        
+
         if tool_description:
             if "adk_agent_definition" not in data:
                 data["adk_agent_definition"] = {}
@@ -567,30 +564,30 @@ class AgentSpaceManager:
                 "tool_description": tool_description
             }
             update_mask.append("adk_agent_definition.tool_settings.tool_description")
-        
+
         if not update_mask:
             typer.echo("Warning: No fields to update", err=True)
             return True
-        
+
         params = {"updateMask": ",".join(update_mask)}
-        
+
         try:
             response = requests.patch(url, headers=headers, json=data, params=params)
             response.raise_for_status()
-            
+
             typer.echo(f"Successfully updated agent configuration!")
             return True
-            
+
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error updating agent configuration: {e}", err=True)
             if hasattr(e.response, 'text'):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
-    
+
     def list_agents(self) -> bool:
         """
         List all agents in the AgentSpace app.
-        
+
         Returns:
             True if successful, False otherwise
         """
@@ -598,61 +595,61 @@ class AgentSpaceManager:
         if not project_number:
             typer.echo("Error: AGENTSPACE_PROJECT_NUMBER not found in environment", err=True)
             return False
-        
+
         as_app = self.env_vars.get("AGENTSPACE_APP_ID")
         if not as_app:
             typer.echo("Error: AGENTSPACE_APP_ID not found in environment", err=True)
             return False
-        
+
         access_token = self._get_access_token()
         if not access_token:
             typer.echo("Error: Failed to get access token", err=True)
             return False
-        
+
         url = f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/locations/global/collections/default_collection/engines/{as_app}/assistants/default_assistant/agents"
-        
+
         headers = {
             "Authorization": f"Bearer {access_token}",
             "X-Goog-User-Project": project_number,
         }
-        
+
         try:
             response = requests.get(url, headers=headers)
             response.raise_for_status()
-            
+
             result = response.json()
             agents = result.get("agents", [])
-            
+
             if not agents:
                 typer.echo("No agents found in AgentSpace app.")
                 return True
-            
+
             typer.echo(f"\nFound {len(agents)} agent(s) in AgentSpace:\n")
             for i, agent in enumerate(agents, 1):
                 name = agent.get("name", "")
                 agent_id = name.split("/")[-1] if "/" in name else name
                 display_name = agent.get("displayName", "N/A")
                 description = agent.get("description", "N/A")
-                
+
                 typer.echo(f"{i}. Agent ID: {agent_id}")
                 typer.echo(f"   Display Name: {display_name}")
                 typer.echo(f"   Description: {description}")
-                
+
                 # Show tool description if available
                 adk_def = agent.get("adk_agent_definition", {})
                 tool_settings = adk_def.get("tool_settings", {})
                 if tool_settings.get("tool_description"):
                     typer.echo(f"   Tool Description: {tool_settings['tool_description']}")
-                
+
                 # Show reasoning engine if available
                 prov_engine = adk_def.get("provisioned_reasoning_engine", {})
                 if prov_engine.get("reasoning_engine"):
                     typer.echo(f"   Reasoning Engine: {prov_engine['reasoning_engine']}")
-                
+
                 typer.echo()
-            
+
             return True
-            
+
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error listing agents: {e}", err=True)
             if hasattr(e.response, 'text'):
@@ -662,7 +659,7 @@ class AgentSpaceManager:
     def search_agentspace(self, query: str = "test query") -> bool:
         """Test AgentSpace search functionality via Discovery Engine API."""
         typer.echo(f"Testing AgentSpace search with query: '{query}'...")
-        
+
         # Validate required environment variables
         required_vars = ["AGENTSPACE_PROJECT_NUMBER", "AGENTSPACE_APP_ID"]
         missing = [var for var in required_vars if not self.env_vars.get(var)]
@@ -707,14 +704,14 @@ class AgentSpaceManager:
         if response and response.status_code == 200:
             result = response.json()
             typer.secho(" AgentSpace search test successful!", fg=typer.colors.GREEN)
-            
+
             # Display search results
             results = result.get("results", [])
             total_size = result.get("totalSize", 0)
-            
+
             typer.echo(f"  Total results: {total_size}")
             typer.echo(f"  Returned results: {len(results)}")
-            
+
             if results:
                 typer.echo("  Search results:")
                 for i, result_item in enumerate(results[:3], 1):  # Show first 3 results
@@ -722,14 +719,14 @@ class AgentSpaceManager:
                     title = document.get("title", "No title")
                     snippet = result_item.get("snippet", "No snippet available")
                     relevance = result_item.get("relevanceScore", "N/A")
-                    
+
                     typer.echo(f"    {i}. Title: {title}")
                     typer.echo(f"       Relevance: {relevance}")
                     typer.echo(f"       Snippet: {snippet[:100]}{'...' if len(snippet) > 100 else ''}")
                     typer.echo("")
             else:
                 typer.echo("  No search results returned")
-            
+
             return True
         else:
             typer.secho(" AgentSpace search test failed!", fg=typer.colors.RED)

@@ -1,8 +1,18 @@
 # Makefile for Agentic SOC AgentSpace Management
+
+# Default target - must be first
+.DEFAULT_GOAL := help
+
 .PHONY: help install setup clean deploy test agentspace-register agentspace-update agentspace-verify agentspace-delete agentspace-url oauth-setup oauth-create-auth oauth-verify oauth-delete
 
 # Default environment file
 ENV_FILE := .env
+
+# Load environment variables if .env exists
+ifneq (,$(wildcard $(ENV_FILE)))
+include $(ENV_FILE)
+export
+endif
 
 # Python executable (use venv if available)
 PYTHON := $(shell if [ -d "venv" ]; then echo "venv/bin/python"; else echo "python3"; fi)
@@ -12,51 +22,61 @@ MANAGE_AGENTSPACE := installation_scripts/manage_agentspace.py
 MANAGE_AGENT_ENGINE := installation_scripts/manage_agent_engine.py
 MANAGE_OAUTH := installation_scripts/manage_oauth.py
 
+# Validation targets
+.PHONY: check-prereqs check-deploy check-integration
+
+check-prereqs: ## Validate Stage 1 prerequisites
+	@if [ -z "$(PROJECT_ID)" ]; then echo "ERROR: PROJECT_ID not set in $(ENV_FILE)"; exit 1; fi
+	@if [ -z "$(PROJECT_NUMBER)" ]; then echo "ERROR: PROJECT_NUMBER not set in $(ENV_FILE)"; exit 1; fi
+	@if [ -z "$(LOCATION)" ]; then echo "ERROR: LOCATION not set in $(ENV_FILE)"; exit 1; fi
+	@if [ -z "$(STAGING_BUCKET)" ]; then echo "ERROR: STAGING_BUCKET not set in $(ENV_FILE)"; exit 1; fi
+	@if [ -z "$(GOOGLE_API_KEY)" ]; then echo "ERROR: GOOGLE_API_KEY not set in $(ENV_FILE)"; exit 1; fi
+	@echo "Stage 1 prerequisites validated"
+
+check-deploy: ## Validate Stage 2 deployment outputs
+	@if [ -z "$(REASONING_ENGINE)" ]; then echo "ERROR: REASONING_ENGINE not set - run 'make deploy' first"; exit 1; fi
+	@if [ -z "$(AGENT_ENGINE_RESOURCE_NAME)" ]; then echo "ERROR: AGENT_ENGINE_RESOURCE_NAME not set - run 'make deploy' first"; exit 1; fi
+	@echo "Stage 2 deployment outputs validated"
+
+check-integration: check-deploy ## Validate Stage 3 integration requirements
+	@if [ -z "$(AGENTSPACE_APP_ID)" ]; then echo "WARNING: AGENTSPACE_APP_ID not set - required for AgentSpace operations"; fi
+	@echo "Stage 3 integration requirements checked"
+
 help: ## Show this help message
 	@echo ""
-	@echo "\033[1;34m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
-	@echo "\033[1;34m║                    Agentic SOC AgentSpace Management                         ║\033[0m"
-	@echo "\033[1;34m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
+	@echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+	@echo "║                    Agentic SOC AgentSpace Management                         ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 	@echo ""
-	@echo "\033[1;32mSetup & Development\033[0m"
-	@grep -E '^(setup|install|clean|check-env|lint|format):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^(setup|install|clean|check-env|lint|format):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "Setup & Development"
+	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;33mDeployment & Testing\033[0m"
-	@grep -E '^(deploy|test|full-deploy|redeploy|oauth-workflow|full-deploy-with-oauth):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^(deploy|test|full-deploy|redeploy|oauth-workflow|full-deploy-with-oauth):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "Deployment & Testing"
+	@grep -h -E '^(deploy|test|full-deploy):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;35mAgentSpace Management\033[0m"
-	@grep -E '^manage-agentspace-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^manage-agentspace-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "AgentSpace Management"
+	@grep -h -E '^manage-agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-40s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;34mOAuth Management\033[0m"
-	@grep -E '^oauth-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^oauth-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "OAuth Management"
+	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;31mAgent Engine Management\033[0m"
-	@grep -E '^manage-agent-engine-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^manage-agent-engine-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "Agent Engine Management"
+	@grep -h -E '^manage-agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-45s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;36mWorkflows & Utilities\033[0m"
-	@grep -E '^(status|cleanup):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; max=0} {if(length($$1)>max) max=length($$1)} END {print max}' > /tmp/max_width.tmp
-	@grep -E '^(status|cleanup):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "; getline max < "/tmp/max_width.tmp"; max+=5} {printf "  \033[36m%-*s\033[0m %s\n", max, $$1, $$2}'
+	@echo "Workflows & Utilities"
+	@grep -h -E '^(status|cleanup|redeploy|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
 	@echo ""
-	@echo "\033[1;37mUsage Examples:\033[0m"
-	@echo "  \033[33mmake setup\033[0m                           - Initialize project and install dependencies"
-	@echo "  \033[33mmake full-deploy\033[0m                      - Complete deployment workflow"
-	@echo "  \033[33mmake oauth-setup CLIENT_SECRET=path/to/client_secret.json\033[0m - Setup OAuth from client secret"
-	@echo "  \033[33mmake oauth-workflow\033[0m                   - Create and verify OAuth authorization"
-	@echo "  \033[33mmake full-deploy-with-oauth\033[0m           - Full deployment with OAuth integration"
-	@echo "  \033[33mmake manage-agentspace-link-agent\033[0m     - Link agent to AgentSpace with OAuth"
-	@echo "  \033[33mmake manage-agentspace-list-agents\033[0m    - List all agents in AgentSpace"
-	@echo "  \033[33mmake manage-agent-engine-delete-by-index INDEX=1\033[0m - Delete agent by index"
-	@echo "  \033[33mmake cleanup\033[0m                          - List and clean up old agents"
+	@echo "Usage Examples:"
+	@echo "  make setup                    - Initialize project and install dependencies"
+	@echo "  make deploy                   - Deploy the agent engine"
+	@echo "  make test                     - Test the deployed agent"
+	@echo "  make manage-agentspace-register - Register agent with AgentSpace"
+	@echo "  make manage-agentspace-verify  - Check status and get URLs"
 	@echo ""
-	@echo "\033[1;37mNotes:\033[0m"
-	@echo "  • Environment variables are loaded from \033[33m.env\033[0m file"
-	@echo "  • Use \033[33mENV_FILE=path\033[0m to specify different environment file"
-	@echo "  • Agent deletion requires \033[33mINDEX=number\033[0m or \033[33mRESOURCE=name\033[0m parameter"
+	@echo "Notes:"
+	@echo "  • Environment variables are loaded from .env file"
+	@echo "  • Use ENV_FILE=path to specify different environment file"
+	@echo "  • See docs/DEPLOYMENT_WORKFLOW.md for detailed instructions"
 	@echo ""
 
 install: ## Install Python dependencies
@@ -75,26 +95,39 @@ clean: ## Clean up temporary files and cache
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
-deploy: ## Deploy the main agent engine
-	$(PYTHON) main.py
+deploy: check-prereqs ## Deploy the main agent engine
+	@$(PYTHON) main.py
+	@echo "========================================"
+	@echo "DEPLOYMENT COMPLETE - Save these values to .env:"
+	@echo "========================================"
+	@echo "Check the output above for:"
+	@echo "  REASONING_ENGINE=<numeric_id>"
+	@echo "  AGENT_ENGINE_RESOURCE_NAME=<full_resource_path>"
+	@echo "========================================"
 
 deploy-and-delete: ## Deploy agent engine and delete after test (for development)
 	$(PYTHON) main.py --delete
 
-test: ## Test the deployed agent engine
+test: check-deploy ## Test the deployed agent engine
 	$(PYTHON) test_agent_engine.py
 
 # AgentSpace management targets
-manage-agentspace-register: ## Register agent with AgentSpace
-	$(PYTHON) $(MANAGE_AGENTSPACE) register --env-file $(ENV_FILE)
+manage-agentspace-register: check-integration ## Register agent with AgentSpace
+	@$(PYTHON) $(MANAGE_AGENTSPACE) register --env-file $(ENV_FILE)
+	@echo "========================================"
+	@echo "REGISTRATION COMPLETE - Save this value to .env:"
+	@echo "========================================"
+	@echo "Check the output above for:"
+	@echo "  AGENTSPACE_AGENT_ID=<numeric_id>"
+	@echo "========================================"
 
 manage-agentspace-register-force: ## Force re-register agent with AgentSpace
 	$(PYTHON) $(MANAGE_AGENTSPACE) register --force --env-file $(ENV_FILE)
 
-manage-agentspace-update: ## Update existing AgentSpace agent configuration
+manage-agentspace-update: check-integration ## Update existing AgentSpace agent configuration
 	$(PYTHON) $(MANAGE_AGENTSPACE) update --env-file $(ENV_FILE)
 
-manage-agentspace-verify: ## Verify AgentSpace agent configuration and status
+manage-agentspace-verify: check-integration ## Verify AgentSpace agent configuration and status
 	$(PYTHON) $(MANAGE_AGENTSPACE) verify --env-file $(ENV_FILE)
 
 manage-agentspace-delete: ## Delete agent from AgentSpace
@@ -116,8 +149,14 @@ manage-agentspace-test: ## Test AgentSpace search functionality (use: make manag
 manage-agentspace-datastore: ## Ensure the AgentSpace engine has a data store configured
 	$(PYTHON) $(MANAGE_AGENTSPACE) ensure-datastore --env-file $(ENV_FILE)
 
-manage-agentspace-link-agent: ## Link deployed agent to AgentSpace with OAuth
-	$(PYTHON) $(MANAGE_AGENTSPACE) link-agent --env-file $(ENV_FILE)
+manage-agentspace-link-agent: check-integration ## Link deployed agent to AgentSpace with OAuth
+	@$(PYTHON) $(MANAGE_AGENTSPACE) link-agent --env-file $(ENV_FILE)
+	@echo "========================================"
+	@echo "AGENT LINK COMPLETE - Save this value to .env:"
+	@echo "========================================"
+	@echo "Check the output above for:"
+	@echo "  AGENTSPACE_AGENT_ID=<numeric_id>"
+	@echo "========================================"
 
 manage-agentspace-update-agent: ## Update agent configuration in AgentSpace
 	$(PYTHON) $(MANAGE_AGENTSPACE) update-agent-config --env-file $(ENV_FILE)
@@ -134,7 +173,13 @@ oauth-setup: ## Interactive OAuth client setup from client_secret.json (use: mak
 	$(PYTHON) $(MANAGE_OAUTH) setup $(CLIENT_SECRET) --env-file $(ENV_FILE)
 
 oauth-create-auth: ## Create OAuth authorization in Discovery Engine
-	$(PYTHON) $(MANAGE_OAUTH) create-auth --env-file $(ENV_FILE)
+	@$(PYTHON) $(MANAGE_OAUTH) create-auth --env-file $(ENV_FILE)
+	@echo "========================================"
+	@echo "OAUTH SETUP COMPLETE - Save this value to .env:"
+	@echo "========================================"
+	@echo "Check the output above for:"
+	@echo "  OAUTH_AUTH_ID=<auth_id>"
+	@echo "========================================"
 
 oauth-verify: ## Check OAuth authorization status
 	$(PYTHON) $(MANAGE_OAUTH) verify --env-file $(ENV_FILE)
