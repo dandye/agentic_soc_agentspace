@@ -59,10 +59,10 @@ Edit the `.env` file with your project details as shown above.
 
 ```bash
 # Deploy the agent (keeps agent running)
-make deploy
+make agent-engine-deploy
 
 # Or for development - deploy, test, then delete
-make deploy-and-delete
+make agent-engine-deploy-and-delete
 ```
 
 This will:
@@ -85,7 +85,7 @@ Agent deployed: projects/123456/locations/us-central1/reasoningEngines/789012
 echo "REASONING_ENGINE=789012" >> .env
 
 # Test the deployed agent
-make test
+make agent-engine-test
 ```
 
 You should see the agent respond to your test query.
@@ -139,7 +139,7 @@ make oauth-verify
 
 ```bash
 # Link your deployed agent to AgentSpace
-make manage-agentspace-link-agent
+make agentspace-link-agent
 ```
 
 Expected output:
@@ -153,10 +153,10 @@ Agent ID: soc_security_agent_001
 
 ```bash
 # Verify the AgentSpace configuration
-make manage-agentspace-verify
+make agentspace-verify
 
 # Get the AgentSpace UI URL
-make manage-agentspace-url
+make agentspace-url
 ```
 
 Click the URL to open AgentSpace and interact with your agent through the UI.
@@ -180,7 +180,7 @@ make full-deploy-with-oauth
 ### Redeploy Existing Agent
 ```bash
 # Redeploy and update existing agent
-make redeploy
+make redeploy-all
 ```
 
 ### OAuth Workflow Only
@@ -201,16 +201,16 @@ make oauth-workflow
 ### Agent Management
 ```bash
 # List all deployed agents
-make manage-agent-engine-list
+make agent-engine-list
 
 # List agents with verbose output
-make manage-agent-engine-list-verbose
+V=1 make agent-engine-list
 
 # Delete an agent by index
-make manage-agent-engine-delete-by-index INDEX=1
+make agent-engine-delete-by-index INDEX=1
 
 # Force delete without confirmation
-make manage-agent-engine-delete-force INDEX=1
+FORCE=1 make agent-engine-delete-by-index INDEX=1
 
 # Clean up old agents interactively
 make cleanup
@@ -219,19 +219,19 @@ make cleanup
 ### AgentSpace Management
 ```bash
 # Register agent with AgentSpace
-make manage-agentspace-register
+make agentspace-register
 
 # Update AgentSpace configuration
-make manage-agentspace-update
+make agentspace-update
 
 # List all agents in AgentSpace
-make manage-agentspace-list-agents
+make agentspace-list-agents
 
 # Test AgentSpace search
-make manage-agentspace-test QUERY="security incident"
+make agentspace-test QUERY="security incident"
 
 # Ensure data store exists
-make manage-agentspace-datastore
+make agentspace-datastore
 ```
 
 ### Monitoring

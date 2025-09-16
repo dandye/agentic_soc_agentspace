@@ -37,7 +37,7 @@
                                     │
                                     ▼
                         ┌──────────────────────┐
-                        │    make deploy       │
+                        │    make agent-engine-deploy       │
                         │  (validates prereqs) │
                         └──────────────────────┘
                                     │
@@ -76,7 +76,7 @@
                     │                               │
                     ▼                               ▼
     ┌───────────────────────────┐      ┌──────────────────────┐
-    │ make manage-agentspace-   │      │ make oauth-create-   │
+    │ make agentspace-   │      │ make oauth-create-   │
     │      register             │      │      auth            │
     └───────────────────────────┘      └──────────────────────┘
                     │                               │
@@ -90,7 +90,7 @@
                     │                               │
                     │                               ▼
                     │                   ┌──────────────────────┐
-                    │                   │ make manage-         │
+                    │                   │ make          │
                     │                   │   agentspace-        │
                     │                   │   link-agent         │
                     │                   └──────────────────────┘
@@ -154,7 +154,7 @@ DATASTORE_PATH              ──┘   (Optional)
 
 ### Stage 2: Deployment Outputs (System Generated)
 ```
-                    make deploy
+                    make agent-engine-deploy
                         │
                         ▼
 REASONING_ENGINE ─────────────► "1234567890987654321"
@@ -168,9 +168,9 @@ AGENT_ENGINE_RESOURCE_NAME ───► "projects/.../reasoningEngines/..."
                         ▼
 OAUTH_AUTH_ID ────────────────► "my-oauth-auth"
 
-            make manage-agentspace-register
+            make agentspace-register
                         OR
-            make manage-agentspace-link-agent
+            make agentspace-link-agent
                         │
                         ▼
 AGENTSPACE_AGENT_ID ──────────► "1234567890987654321"
@@ -231,7 +231,7 @@ check-prereqs        check-deploy        check-integration
 | CHRONICLE_* | 1 | User provides | If using Chronicle |
 | SOAR_* | 1 | User provides | If using SOAR |
 | VT_APIKEY | 1 | User provides | If using GTI |
-| REASONING_ENGINE | 2 | `make deploy` output | Yes |
-| AGENT_ENGINE_RESOURCE_NAME | 2 | `make deploy` output | Yes |
+| REASONING_ENGINE | 2 | `make agent-engine-deploy` output | Yes |
+| AGENT_ENGINE_RESOURCE_NAME | 2 | `make agent-engine-deploy` output | Yes |
 | OAUTH_AUTH_ID | 3 | `make oauth-create-auth` output | If using OAuth |
-| AGENTSPACE_AGENT_ID | 3 | `make manage-agentspace-register` output | If using AgentSpace |
+| AGENTSPACE_AGENT_ID | 3 | `make agentspace-register` output | If using AgentSpace |

@@ -127,10 +127,10 @@ Limits can be increased via quota requests.
 git pull origin main
 
 # Redeploy agent
-make deploy
+make agent-engine-deploy
 
 # Update AgentSpace configuration
-make manage-agentspace-update
+make agentspace-update
 ```
 
 ### Can I rollback deployments?
@@ -148,7 +148,7 @@ Yes:
 cp .env .env.backup
 
 # Export agent configuration
-make manage-agentspace-list-agents > agent_config.txt
+make agentspace-list-agents > agent_config.txt
 
 # Backup to Cloud Storage
 gsutil cp .env gs://your-backup-bucket/

@@ -18,7 +18,7 @@ STAGE 1: Prerequisites (before deployment)
     ├── STAGING_BUCKET, GOOGLE_API_KEY
     └── Security tool configs (CHRONICLE_*, SOAR_*, VT_APIKEY)
                     ↓
-STAGE 2: Deployment Outputs (from 'make deploy')
+STAGE 2: Deployment Outputs (from 'make agent-engine-deploy')
     ├── REASONING_ENGINE
     └── AGENT_ENGINE_RESOURCE_NAME
                     ↓
@@ -59,7 +59,7 @@ make setup
 
 #### 2.1 Deploy the agent engine
 ```bash
-make deploy
+make agent-engine-deploy
 ```
 
 **Important**: Watch the output for these values and save them to your `.env` file:
@@ -79,7 +79,7 @@ DEPLOYMENT COMPLETE - Save these values to .env:
 
 #### 2.2 Test the deployment
 ```bash
-make test
+make agent-engine-test
 ```
 
 ### Stage 3: Integration (Optional)
@@ -91,7 +91,7 @@ Choose your integration path based on your needs:
 If you just need to register the agent with AgentSpace:
 
 ```bash
-make manage-agentspace-register
+make agentspace-register
 ```
 
 Save the displayed `AGENTSPACE_AGENT_ID` to your `.env` file.
@@ -114,7 +114,7 @@ Save the displayed `OAUTH_AUTH_ID` to your `.env` file.
 
 ##### B.3 Link agent with OAuth
 ```bash
-make manage-agentspace-link-agent
+make agentspace-link-agent
 ```
 
 Save the displayed `AGENTSPACE_AGENT_ID` to your `.env` file.
@@ -134,7 +134,7 @@ This runs setup, deploy, and all integration steps automatically.
 After deployment, verify everything is working:
 
 ```bash
-make manage-agentspace-verify
+make agentspace-verify
 ```
 
 This will show:
@@ -151,37 +151,37 @@ cp .env.example .env
 # Edit .env with your values
 
 # 2. Deploy
-make deploy
+make agent-engine-deploy
 # Save REASONING_ENGINE and AGENT_ENGINE_RESOURCE_NAME to .env
 
 # 3. Register with AgentSpace
-make manage-agentspace-register
+make agentspace-register
 # Save AGENTSPACE_AGENT_ID to .env
 
 # 4. Verify
-make manage-agentspace-verify
+make agentspace-verify
 ```
 
 ### Redeployment
 ```bash
 # 1. Deploy new version
-make deploy
+make agent-engine-deploy
 # Update REASONING_ENGINE and AGENT_ENGINE_RESOURCE_NAME in .env
 
 # 2. Update AgentSpace
-make manage-agentspace-update
+make agentspace-update
 
 # 3. Verify
-make manage-agentspace-verify
+make agentspace-verify
 ```
 
 ### Cleanup Old Deployments
 ```bash
 # List all agent engines
-make manage-agent-engine-list
+make agent-engine-list
 
 # Delete specific engine by index
-make manage-agent-engine-delete-by-index INDEX=2
+make agent-engine-delete-by-index INDEX=2
 ```
 
 ## Troubleshooting
@@ -194,7 +194,7 @@ If you get errors about missing variables, check which stage they come from:
 - Solution: Edit `.env` and add the missing prerequisite variables
 
 **Stage 2 errors**: These come from deployment output
-- Solution: Run `make deploy` and save the output values
+- Solution: Run `make agent-engine-deploy` and save the output values
 
 **Stage 3 errors**: These come from integration commands
 - Solution: Run the appropriate integration command and save the output
@@ -246,7 +246,7 @@ Start
 
 After successful deployment:
 
-1. Access your agent through the AgentSpace URL (shown by `make manage-agentspace-verify`)
+1. Access your agent through the AgentSpace URL (shown by `make agentspace-verify`)
 2. Test agent functionality with security queries
 3. Monitor logs in Google Cloud Console
 4. Configure additional integrations as needed
@@ -259,17 +259,17 @@ After successful deployment:
 - `make setup` - Initialize project
 
 **Stage 2 (Deployment)**
-- `make deploy` - Deploy agent engine
-- `make test` - Test deployment
+- `make agent-engine-deploy` - Deploy agent engine
+- `make agent-engine-test` - Test deployment
 
 **Stage 3 (Integration)**
-- `make manage-agentspace-register` - Register with AgentSpace
+- `make agentspace-register` - Register with AgentSpace
 - `make oauth-create-auth` - Create OAuth authorization
-- `make manage-agentspace-link-agent` - Link agent with OAuth
+- `make agentspace-link-agent` - Link agent with OAuth
 
 **Verification**
-- `make manage-agentspace-verify` - Check status
-- `make manage-agent-engine-list` - List all engines
+- `make agentspace-verify` - Check status
+- `make agent-engine-list` - List all engines
 
 ### Environment Variable Reference
 

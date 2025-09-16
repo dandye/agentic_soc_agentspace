@@ -83,7 +83,7 @@ python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(os.ge
 
 1. **Verify Agent Registration**
    ```bash
-   make manage-agentspace-verify
+   make agentspace-verify
    ```
 
 2. **Check Resource Name Format**
@@ -95,7 +95,7 @@ python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(os.ge
 
 3. **Re-link Agent**
    ```bash
-   make manage-agentspace-link-agent
+   make agentspace-link-agent
    ```
 
 ### Data Store Creation Fails
@@ -106,7 +106,7 @@ python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(os.ge
 This is expected behavior. Engines with existing data stores will use them for search.
 ```bash
 # Verify data store status
-make manage-agentspace-datastore
+make agentspace-datastore
 ```
 
 ### OAuth Authorization Errors
@@ -141,7 +141,7 @@ make manage-agentspace-datastore
 
 1. **Check Agent Status**
    ```bash
-   make manage-agent-engine-list-verbose
+   V=1 make agent-engine-list
    ```
 
 2. **View Logs**
@@ -247,7 +247,7 @@ python -m secops_mcp test
 python installation_scripts/manage_oauth.py test
 
 # Test AgentSpace search
-make manage-agentspace-test
+make agentspace-test
 ```
 
 ### Monitor Resources
