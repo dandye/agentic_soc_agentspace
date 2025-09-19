@@ -3,10 +3,30 @@
 # Default target - must be first
 .DEFAULT_GOAL := help
 
-.PHONY: help install setup clean deploy test agentspace-register agentspace-update agentspace-verify agentspace-delete agentspace-url oauth-setup oauth-create-auth oauth-verify oauth-delete
+.PHONY: help install setup clean check-prereqs check-deploy check-integration \
+	agent-engine-deploy agent-engine-deploy-and-delete agent-engine-test \
+	agent-engine-list agent-engine-delete-by-index agent-engine-delete-by-resource agent-engine-redeploy \
+	agentspace-register agentspace-update agentspace-verify agentspace-delete \
+	agentspace-url agentspace-test agentspace-datastore agentspace-link-agent \
+	agentspace-update-agent agentspace-list-agents agentspace-redeploy \
+	oauth-setup oauth-create-auth oauth-verify oauth-delete \
+	redeploy-all oauth-workflow full-deploy-with-oauth status cleanup check-env lint format
 
 # Default environment file
-ENV_FILE := .env
+ENV_FILE ?= .env
+
+# Verbosity control
+V ?= 0
+ifeq ($(V),1)
+	VERBOSE := --verbose
+	Q :=
+else
+	VERBOSE :=
+	Q := @
+endif
+
+# Parallel jobs control  
+MAKEFLAGS += --no-print-directory
 
 # Load environment variables if .env exists
 ifneq (,$(wildcard $(ENV_FILE)))
@@ -26,16 +46,16 @@ MANAGE_OAUTH := installation_scripts/manage_oauth.py
 .PHONY: check-prereqs check-deploy check-integration
 
 check-prereqs: ## Validate Stage 1 prerequisites
-	@if [ -z "$(PROJECT_ID)" ]; then echo "ERROR: PROJECT_ID not set in $(ENV_FILE)"; exit 1; fi
-	@if [ -z "$(PROJECT_NUMBER)" ]; then echo "ERROR: PROJECT_NUMBER not set in $(ENV_FILE)"; exit 1; fi
-	@if [ -z "$(LOCATION)" ]; then echo "ERROR: LOCATION not set in $(ENV_FILE)"; exit 1; fi
-	@if [ -z "$(STAGING_BUCKET)" ]; then echo "ERROR: STAGING_BUCKET not set in $(ENV_FILE)"; exit 1; fi
-	@if [ -z "$(GOOGLE_API_KEY)" ]; then echo "ERROR: GOOGLE_API_KEY not set in $(ENV_FILE)"; exit 1; fi
-	@echo "Stage 1 prerequisites validated"
+	$(Q)if [ -z "$(PROJECT_ID)" ]; then echo "ERROR: PROJECT_ID not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(PROJECT_NUMBER)" ]; then echo "ERROR: PROJECT_NUMBER not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(LOCATION)" ]; then echo "ERROR: LOCATION not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(STAGING_BUCKET)" ]; then echo "ERROR: STAGING_BUCKET not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(GOOGLE_API_KEY)" ]; then echo "ERROR: GOOGLE_API_KEY not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)echo "Stage 1 prerequisites validated"
 
 check-deploy: ## Validate Stage 2 deployment outputs
-	@if [ -z "$(REASONING_ENGINE)" ]; then echo "ERROR: REASONING_ENGINE not set - run 'make deploy' first"; exit 1; fi
-	@if [ -z "$(AGENT_ENGINE_RESOURCE_NAME)" ]; then echo "ERROR: AGENT_ENGINE_RESOURCE_NAME not set - run 'make deploy' first"; exit 1; fi
+	@if [ -z "$(REASONING_ENGINE)" ]; then echo "ERROR: REASONING_ENGINE not set - run 'make agent-engine-deploy' first"; exit 1; fi
+	@if [ -z "$(AGENT_ENGINE_RESOURCE_NAME)" ]; then echo "ERROR: AGENT_ENGINE_RESOURCE_NAME not set - run 'make agent-engine-deploy' first"; exit 1; fi
 	@echo "Stage 2 deployment outputs validated"
 
 check-integration: check-deploy ## Validate Stage 3 integration requirements
@@ -44,38 +64,38 @@ check-integration: check-deploy ## Validate Stage 3 integration requirements
 
 help: ## Show this help message
 	@echo ""
-	@echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║                    Agentic SOC AgentSpace Management                         ║"
-	@echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+	@echo "\033[1;34m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
+	@echo "\033[1;34m║                    Agentic SOC AgentSpace Management                         ║\033[0m"
+	@echo "\033[1;34m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
 	@echo ""
-	@echo "Setup & Development"
-	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
+	@echo "\033[1;32mSetup & Development\033[0m"
+	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Deployment & Testing"
-	@grep -h -E '^(deploy|test|full-deploy):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
+	@echo "\033[1;31mAgent Engine Management\033[0m"
+	@grep -h -E '^agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "AgentSpace Management"
-	@grep -h -E '^manage-agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-40s %s\n", $$1, $$2}'
+	@echo "\033[1;35mAgentSpace Management\033[0m"
+	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "OAuth Management"
-	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
+	@echo "\033[1;34mOAuth Management\033[0m"
+	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Agent Engine Management"
-	@grep -h -E '^manage-agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-45s %s\n", $$1, $$2}'
+	@echo "\033[1;36mWorkflows & Utilities\033[0m"
+	@grep -h -E '^(status|cleanup|.*-redeploy|redeploy-all|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Workflows & Utilities"
-	@grep -h -E '^(status|cleanup|redeploy|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  %-30s %s\n", $$1, $$2}'
+	@echo "\033[1;37mUsage Examples:\033[0m"
+	@echo "  \033[33mmake setup\033[0m                              - Initialize project and install dependencies"
+	@echo "  \033[33mmake agent-engine-deploy\033[0m                - Deploy the agent engine"
+	@echo "  \033[33mmake agent-engine-test\033[0m                  - Test the deployed agent"
+	@echo "  \033[33mmake agentspace-register\033[0m                - Register agent with AgentSpace"
+	@echo "  \033[33mFORCE=1 make agentspace-register\033[0m        - Force re-register agent with AgentSpace"
+	@echo "  \033[33mmake agentspace-verify\033[0m                  - Check status and get URLs"
 	@echo ""
-	@echo "Usage Examples:"
-	@echo "  make setup                    - Initialize project and install dependencies"
-	@echo "  make deploy                   - Deploy the agent engine"
-	@echo "  make test                     - Test the deployed agent"
-	@echo "  make manage-agentspace-register - Register agent with AgentSpace"
-	@echo "  make manage-agentspace-verify  - Check status and get URLs"
-	@echo ""
-	@echo "Notes:"
-	@echo "  • Environment variables are loaded from .env file"
-	@echo "  • Use ENV_FILE=path to specify different environment file"
+	@echo "\033[1;37mNotes:\033[0m"
+	@echo "  • Environment variables are loaded from \033[33m.env\033[0m file"
+	@echo "  • Use \033[33mENV_FILE=path\033[0m to specify different environment file"
+	@echo "  • Use \033[33mV=1\033[0m for verbose output (shows all commands and detailed script output)"
+	@echo "  • Use \033[33mFORCE=1\033[0m with delete/register commands to skip confirmations"
 	@echo "  • See docs/DEPLOYMENT_WORKFLOW.md for detailed instructions"
 	@echo ""
 
@@ -83,73 +103,75 @@ install: ## Install Python dependencies
 	$(PYTHON) -m pip install -r requirements.txt
 
 setup: ## Set up environment and install dependencies
-	@if [ ! -f "$(ENV_FILE)" ]; then \
+	$(Q)if [ ! -f "$(ENV_FILE)" ]; then \
 		echo "Creating .env file from template..."; \
 		cp .env.example $(ENV_FILE); \
 		echo "Please edit $(ENV_FILE) with your configuration"; \
 	fi
-	@$(MAKE) install
+	$(Q)$(MAKE) install
 
 clean: ## Clean up temporary files and cache
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
-deploy: check-prereqs ## Deploy the main agent engine
-	@$(PYTHON) main.py
-	@echo "========================================"
-	@echo "DEPLOYMENT COMPLETE - Save these values to .env:"
-	@echo "========================================"
-	@echo "Check the output above for:"
-	@echo "  REASONING_ENGINE=<numeric_id>"
-	@echo "  AGENT_ENGINE_RESOURCE_NAME=<full_resource_path>"
-	@echo "========================================"
+agent-engine-deploy: check-prereqs ## Deploy the main agent engine
+	$(Q)$(PYTHON) main.py $(VERBOSE)
+	$(Q)echo "========================================"
+	$(Q)echo "DEPLOYMENT COMPLETE - Save these values to .env:"
+	$(Q)echo "========================================"
+	$(Q)echo "Check the output above for:"
+	$(Q)echo "  REASONING_ENGINE=<numeric_id>"
+	$(Q)echo "  AGENT_ENGINE_RESOURCE_NAME=<full_resource_path>"
+	$(Q)echo "========================================"
 
-deploy-and-delete: ## Deploy agent engine and delete after test (for development)
+agent-engine-deploy-and-delete: ## Deploy agent engine and delete after test (for development)
 	$(PYTHON) main.py --delete
 
-test: check-deploy ## Test the deployed agent engine
+agent-engine-test: check-deploy ## Test the deployed agent engine
 	$(PYTHON) test_agent_engine.py
 
 # AgentSpace management targets
-manage-agentspace-register: check-integration ## Register agent with AgentSpace
-	@$(PYTHON) $(MANAGE_AGENTSPACE) register --env-file $(ENV_FILE)
-	@echo "========================================"
-	@echo "REGISTRATION COMPLETE - Save this value to .env:"
-	@echo "========================================"
-	@echo "Check the output above for:"
-	@echo "  AGENTSPACE_AGENT_ID=<numeric_id>"
-	@echo "========================================"
+agentspace-register: check-integration ## Register agent with AgentSpace (use FORCE=1 to force re-register)
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_AGENTSPACE) register --force --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_AGENTSPACE) register --env-file $(ENV_FILE); \
+		echo "========================================"; \
+		echo "REGISTRATION COMPLETE - Save this value to .env:"; \
+		echo "========================================"; \
+		echo "Check the output above for:"; \
+		echo "  AGENTSPACE_AGENT_ID=<numeric_id>"; \
+		echo "========================================"; \
+	fi
 
-manage-agentspace-register-force: ## Force re-register agent with AgentSpace
-	$(PYTHON) $(MANAGE_AGENTSPACE) register --force --env-file $(ENV_FILE)
-
-manage-agentspace-update: check-integration ## Update existing AgentSpace agent configuration
+agentspace-update: check-integration ## Update existing AgentSpace agent configuration
 	$(PYTHON) $(MANAGE_AGENTSPACE) update --env-file $(ENV_FILE)
 
-manage-agentspace-verify: check-integration ## Verify AgentSpace agent configuration and status
+agentspace-verify: check-integration ## Verify AgentSpace agent configuration and status
 	$(PYTHON) $(MANAGE_AGENTSPACE) verify --env-file $(ENV_FILE)
 
-manage-agentspace-delete: ## Delete agent from AgentSpace
-	$(PYTHON) $(MANAGE_AGENTSPACE) delete --env-file $(ENV_FILE)
+agentspace-delete: ## Delete agent from AgentSpace (use FORCE=1 to delete without confirmation)
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_AGENTSPACE) delete --force --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_AGENTSPACE) delete --env-file $(ENV_FILE); \
+	fi
 
-manage-agentspace-delete-force: ## Force delete agent from AgentSpace without confirmation
-	$(PYTHON) $(MANAGE_AGENTSPACE) delete --force --env-file $(ENV_FILE)
-
-manage-agentspace-url: ## Display AgentSpace UI URL
+agentspace-url: ## Display AgentSpace UI URL
 	$(PYTHON) $(MANAGE_AGENTSPACE) url --env-file $(ENV_FILE)
 
-manage-agentspace-test: ## Test AgentSpace search functionality (use: make manage-agentspace-test QUERY="your query")
+agentspace-test: ## Test AgentSpace search functionality (use: make agentspace-test QUERY="your query")
 	@if [ -n "$(QUERY)" ]; then \
 		$(PYTHON) $(MANAGE_AGENTSPACE) search --query "$(QUERY)" --env-file $(ENV_FILE); \
 	else \
 		$(PYTHON) $(MANAGE_AGENTSPACE) search --env-file $(ENV_FILE); \
 	fi
 
-manage-agentspace-datastore: ## Ensure the AgentSpace engine has a data store configured
+agentspace-datastore: ## Ensure the AgentSpace engine has a data store configured
 	$(PYTHON) $(MANAGE_AGENTSPACE) ensure-datastore --env-file $(ENV_FILE)
 
-manage-agentspace-link-agent: check-integration ## Link deployed agent to AgentSpace with OAuth
+agentspace-link-agent: check-integration ## Link deployed agent to AgentSpace with OAuth
 	@$(PYTHON) $(MANAGE_AGENTSPACE) link-agent --env-file $(ENV_FILE)
 	@echo "========================================"
 	@echo "AGENT LINK COMPLETE - Save this value to .env:"
@@ -158,10 +180,10 @@ manage-agentspace-link-agent: check-integration ## Link deployed agent to AgentS
 	@echo "  AGENTSPACE_AGENT_ID=<numeric_id>"
 	@echo "========================================"
 
-manage-agentspace-update-agent: ## Update agent configuration in AgentSpace
+agentspace-update-agent: ## Update agent configuration in AgentSpace
 	$(PYTHON) $(MANAGE_AGENTSPACE) update-agent-config --env-file $(ENV_FILE)
 
-manage-agentspace-list-agents: ## List all agents in AgentSpace app
+agentspace-list-agents: ## List all agents in AgentSpace app
 	$(PYTHON) $(MANAGE_AGENTSPACE) list-agents --env-file $(ENV_FILE)
 
 # OAuth management targets
@@ -184,58 +206,60 @@ oauth-create-auth: ## Create OAuth authorization in Discovery Engine
 oauth-verify: ## Check OAuth authorization status
 	$(PYTHON) $(MANAGE_OAUTH) verify --env-file $(ENV_FILE)
 
-oauth-delete: ## Remove OAuth authorization
-	$(PYTHON) $(MANAGE_OAUTH) delete --env-file $(ENV_FILE)
-
-oauth-delete-force: ## Force delete OAuth authorization without confirmation
-	$(PYTHON) $(MANAGE_OAUTH) delete --force --env-file $(ENV_FILE)
+oauth-delete: ## Remove OAuth authorization (use FORCE=1 to delete without confirmation)
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_OAUTH) delete --force --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_OAUTH) delete --env-file $(ENV_FILE); \
+	fi
 
 # Agent Engine management targets
-manage-agent-engine-list: ## List all Agent Engine instances
-	$(PYTHON) $(MANAGE_AGENT_ENGINE) list
+agent-engine-list: ## List all Agent Engine instances (use V=1 for detailed output)
+	$(PYTHON) $(MANAGE_AGENT_ENGINE) list $(VERBOSE)
 
-manage-agent-engine-list-verbose: ## List all Agent Engine instances with verbose output
-	$(PYTHON) $(MANAGE_AGENT_ENGINE) list --verbose
-
-manage-agent-engine-delete-by-index: ## Delete Agent Engine instance by index (use: make manage-agent-engine-delete-by-index INDEX=1)
+agent-engine-delete-by-index: ## Delete Agent Engine instance by index (use: make agent-engine-delete-by-index INDEX=1, add FORCE=1 to skip confirmation)
 	@if [ -z "$(INDEX)" ]; then \
-		echo "Error: INDEX is required. Usage: make manage-agent-engine-delete-by-index INDEX=1"; \
+		echo "Error: INDEX is required. Usage: make agent-engine-delete-by-index INDEX=1"; \
 		exit 1; \
 	fi
-	$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --index $(INDEX)
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --index $(INDEX) --force; \
+	else \
+		$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --index $(INDEX); \
+	fi
 
-manage-agent-engine-delete-by-resource: ## Delete Agent Engine instance by resource name (use: make manage-agent-engine-delete-by-resource RESOURCE=...)
+agent-engine-delete-by-resource: ## Delete Agent Engine instance by resource name (use: make agent-engine-delete-by-resource RESOURCE=..., add FORCE=1 to skip confirmation)
 	@if [ -z "$(RESOURCE)" ]; then \
-		echo "Error: RESOURCE is required. Usage: make manage-agent-engine-delete-by-resource RESOURCE=projects/.../reasoningEngines/..."; \
+		echo "Error: RESOURCE is required. Usage: make agent-engine-delete-by-resource RESOURCE=projects/.../reasoningEngines/..."; \
 		exit 1; \
 	fi
-	$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --resource $(RESOURCE)
-
-manage-agent-engine-delete-force: ## Force delete Agent Engine instance by index without confirmation (use: make manage-agent-engine-delete-force INDEX=1)
-	@if [ -z "$(INDEX)" ]; then \
-		echo "Error: INDEX is required. Usage: make manage-agent-engine-delete-force INDEX=1"; \
-		exit 1; \
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --resource $(RESOURCE) --force; \
+	else \
+		$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --resource $(RESOURCE); \
 	fi
-	$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --index $(INDEX) --force
 
 # Workflow targets
-full-deploy: setup deploy manage-agentspace-register ## Complete deployment workflow: setup, deploy, and register
-	@echo "Full deployment completed successfully!"
+agent-engine-redeploy: agent-engine-deploy ## Redeploy the agent engine
+	@echo "Agent engine redeployment completed successfully!"
 
-redeploy: deploy manage-agentspace-update ## Redeploy and update existing agent
-	@echo "Redeployment completed successfully!"
+agentspace-redeploy: agentspace-update ## Update AgentSpace configuration
+	@echo "AgentSpace configuration update completed successfully!"
+
+redeploy-all: agent-engine-deploy agentspace-update ## Redeploy agent engine and update AgentSpace
+	@echo "Full redeployment completed successfully!"
 
 oauth-workflow: oauth-create-auth oauth-verify ## Complete OAuth setup (create auth and verify)
 	@echo "OAuth authorization setup completed successfully!"
 
-full-deploy-with-oauth: setup deploy oauth-workflow manage-agentspace-link-agent ## Deploy agent with OAuth and link to AgentSpace
+full-deploy-with-oauth: setup agent-engine-deploy oauth-workflow agentspace-link-agent ## Deploy agent with OAuth and link to AgentSpace
 	@echo "Full deployment with OAuth completed successfully!"
 
-status: manage-agentspace-verify ## Check status of AgentSpace registration
+status: agentspace-verify ## Check status of AgentSpace registration
 	@echo "Status check completed!"
 
-cleanup: manage-agent-engine-list ## List agents and interactively clean up old instances
-	@echo "Use the agent index numbers shown above with 'make manage-agent-engine-delete-by-index INDEX=<number>' to clean up"
+cleanup: agent-engine-list ## List agents and interactively clean up old instances
+	@echo "Use the agent index numbers shown above with 'make agent-engine-delete-by-index INDEX=<number>' to clean up"
 
 # Development targets
 check-env: ## Check if required environment variables are set
