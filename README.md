@@ -2,9 +2,27 @@
 
 Deploy security-focused AI agents to Google Cloud with integrated access to Chronicle, SOAR, Threat Intelligence, and Security Command Center through the Model Context Protocol (MCP).
 
-## Quick Start
+## Table of Contents
 
-See also: https://github.com/dandye/agentic_soc_agentspace/blob/main/docs/quick-start.md
+- [Quick Start](#quick-start)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Deployment Workflow](#deployment-workflow)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [AgentSpace Integration](#agentspace-integration)
+- [Makefile Reference](#makefile-reference)
+- [Project Structure](#project-structure)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Best Practices](#best-practices)
+- [Documentation](#documentation)
+- [Support](#support)
+
+## Quick Start
 
 ```bash
 # Clone and setup
@@ -19,7 +37,15 @@ cp .env.example .env
 make agent-engine-deploy
 ```
 
-For detailed deployment instructions, see the [Deployment Guide](DEPLOYMENT_GUIDE.md).
+For detailed deployment instructions, see the [Deployment Workflow](#deployment-workflow) section below.
+
+### Available Commands
+
+The Makefile provides a comprehensive set of commands for managing your deployment:
+
+![Makefile Help Output](https://private-user-images.githubusercontent.com/121151/491785880-3f34bbdf-fcaa-4343-b803-9f460ba194a0.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTgzMTM5NTgsIm5iZiI6MTc1ODMxMzY1OCwicGF0aCI6Ii8xMjExNTEvNDkxNzg1ODgwLTNmMzRiYmRmLWZjYWEtNDM0My1iODAzLTlmNDYwYmExOTRhMC5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUwOTE5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MDkxOVQyMDI3MzhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00ZTM5YTgwYWFmOTg1MWViMDMxMTdhNDVkZmE1NGM3NDcwNjgwZjM4OWM3MjUyZTE2MTIyYjA1ZDNlODI4YTNhJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.s5J7oD0CQ9MFAXvNTBYvEwR5jfq-hFQRas0igrWMGi0)
+
+Run `make help` to see this interactive command reference.
 
 ## Overview
 
@@ -46,32 +72,43 @@ This project enables you to:
                                                 └───────────────┘
 ```
 
-## Features
-
-### Integrated Security Tools
-- **Chronicle SecOps**: Real-time threat detection and investigation
-- **SOAR Integration**: Automated incident response workflows
-- **Threat Intelligence**: IOC enrichment and threat analysis
-- **Security Command Center**: Cloud security posture management
-
-### Agent Capabilities
-- Natural language security analysis
-- Automated alert triage and investigation
-- Threat hunting and IOC analysis
-- Incident response coordination
-- Security posture assessment
-
 ## Prerequisites
 
-- **Google Cloud Project** with billing enabled
+### System Requirements
 - **Python 3.10+** installed locally
-- **Google Cloud SDK** configured
-- **Required APIs**:
-  - Vertex AI API
-  - Cloud Storage API
-  - Cloud Build API
+- **4GB RAM** minimum
+- **Git** with submodules support
+- **Google Cloud SDK** installed and configured
 
-See [Deployment Guide](DEPLOYMENT_GUIDE.md#prerequisites) for detailed setup instructions.
+### Google Cloud Requirements
+- **Active GCP project** with billing enabled
+- **Project ID and Project Number** available
+
+### Required APIs
+Enable these APIs in your project:
+```bash
+gcloud services enable aiplatform.googleapis.com
+gcloud services enable storage.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable compute.googleapis.com
+gcloud services enable discoveryengine.googleapis.com
+gcloud services enable securitycenter.googleapis.com  # If using SCC tools
+```
+
+### Required IAM Permissions
+Your account needs these roles:
+- `roles/aiplatform.user` - Create and manage AI Platform resources
+- `roles/storage.admin` - Manage staging bucket
+- `roles/iam.serviceAccountUser` - Create service accounts for agent
+- `roles/discoveryengine.admin` - Manage AgentSpace (if using)
+- `roles/securitycenter.admin` - Access Security Command Center (if using)
+
+### Authentication Setup
+```bash
+gcloud auth application-default login
+gcloud config set project YOUR_PROJECT_ID
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+```
 
 ## Installation
 
@@ -107,50 +144,51 @@ make agent-engine-deploy
   * ToDo: this is constructed from other env vars, so should be removed from .env
 
 
-See [Deployment Guide](DEPLOYMENT_GUIDE.md) for complete instructions.
 
-### 6. Create Agentspace App
+### 6. Create AgentSpace App (Optional)
 
-Use the Google Cloud Console to create the App. Add the App ID to the .env file
+1. Navigate to [Google Cloud Console](https://console.cloud.google.com)
+2. Go to **Vertex AI > Search & Conversation > Apps**
+3. Click **Create App**
+4. Select **Agent** as the app type
+5. Configure with your preferred settings
+6. Copy the App ID and add to `.env` as `AGENTSPACE_APP_ID`
 
-### 7. Associate Agent Engine with Agentspace App
+### 7. Register Agent with AgentSpace
 
-`make agentspace-register`
+```bash
+make agentspace-register
+```
 
+
+## Deployment Workflow
+
+The deployment process consists of three stages:
+
+### Stage 1: Prerequisites (User Configuration)
+Set these variables in your `.env` file before deployment:
+
+**Required Core Variables:**
+- `PROJECT_ID` - Your Google Cloud Project ID
+- `PROJECT_NUMBER` - Your Google Cloud Project Number
+- `LOCATION` - Deployment region (e.g., us-central1)
+- `STAGING_BUCKET` - GCS bucket name for staging
+- `GOOGLE_API_KEY` - API key from Google AI Studio
+
+**Optional Security Tools:**
+- Chronicle SIEM: `CHRONICLE_CUSTOMER_ID`, `CHRONICLE_REGION`, `SECOPS_SA_PATH`
+- SOAR: `SOAR_URL`, `SOAR_APP_KEY`
+- Threat Intelligence: `VT_APIKEY`
+
+### Stage 2: Deployment Outputs
+Run `make agent-engine-deploy` and save the generated `REASONING_ENGINE` ID from the output.
+
+### Stage 3: Integration Outputs
+Run `make agentspace-register` and save the generated `AGENTSPACE_AGENT_ID`.
 
 ## Configuration
 
-There are quite a few configuration items, so here is a recap.
-
-### Required Environment Variables
-
-For LOCATION, Determine which Region Agent Engine is using on this page:
-https://console.cloud.google.com/vertex-ai/agents/agent-engines
-
-`gcloud projects list` in the Cloud Shell Terminal in Google Cloud Console can help you to find thes other values.
-
-```bash
-# Google Cloud Configuration
-PROJECT_ID=your-project-id
-LOCATION=us-central1
-STAGING_BUCKET=your-staging-bucket
-PROJECT_NUMBER=123456789
-
-# SOAR Integration (if using)
-SOAR_URL=https://your-instance.siemplify-soar.com:443
-SOAR_APP_KEY=your-api-key
-```
-
-#### Google SecOps env vars
-
-`CHRONICLE_CUSTOMER_ID` and `CHRONICLE_PROJECT_ID` are on this page:
-https://YOURS.backstory.chronicle.security/settings/profile
-
-For `CHRONICLE_REGION`, see the Chronicle Region Codes as described on:
-https://github.com/google/secops-wrapper/blob/main/regions.md
-
-
-See [.env.example](.env.example) for all configuration options.
+See [.env.example](.env.example) for all environment variables. Key variables are documented in the Deployment Workflow section above.
 
 ## Usage
 
@@ -158,17 +196,11 @@ See [.env.example](.env.example) for all configuration options.
 ```bash
 # Full deployment with all tools
 make agent-engine-deploy
-
+```
 
 ### Test Deployed Agent
 ```bash
-# Set REASONING_ENGINE in .env
-REASONING_ENGINE=ENGINE_ID
-AGENT_ENGINE_RESOURCE_NAME=projects/PROJECT_ID/locations/LOCATION/reasoningEngines/ENGINE_ID
-
-ToDo: since this is constructed from other env vars, it would be good to remove it from the .env
-
-# Run test interface
+# After setting REASONING_ENGINE in .env from deployment output
 python test_agent_engine.py
 ```
 
@@ -181,6 +213,29 @@ python test_agent_engine.py
 "Investigate user account compromise indicators"
 "Find a runbook titled Malware IRP"
 ```
+
+### Workflow Commands
+- `make full-deploy` - Complete standard deployment
+- `make full-deploy-with-oauth` - Deployment with OAuth
+- `make redeploy-all` - Redeploy and update AgentSpace
+
+## AgentSpace Integration
+
+1. **Create AgentSpace App** in [Console](https://console.cloud.google.com) > Vertex AI > Search & Conversation
+2. **Copy App ID** to `.env` as `AGENTSPACE_APP_ID`
+3. **Register agent**: `make agentspace-register` (add OAuth with `make oauth-setup` first if needed)
+4. **Verify**: `make agentspace-verify`
+
+## Makefile Commands
+
+Run `make help` to see all available commands with descriptions (shown in image above).
+
+### Key Environment Flags
+- `FORCE=1` - Skip confirmation prompts
+- `V=1` - Verbose output
+- `INDEX=n` - Specify item index
+
+**Example:** `FORCE=1 make agentspace-register`
 
 ## Project Structure
 
@@ -250,39 +305,65 @@ python -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.ge
 
 ## Troubleshooting
 
-Common issues and solutions are documented in the [Deployment Guide](DEPLOYMENT_GUIDE.md#troubleshooting).
+### Common Issues & Quick Fixes
 
-### Quick Fixes
+| Issue | Solution |
+|-------|----------|
+| **403/401 Auth Error** | `gcloud auth application-default login` |
+| **API not enabled** | `gcloud services enable aiplatform.googleapis.com` |
+| **Bucket not found** | `gsutil mb -p $PROJECT_ID gs://$STAGING_BUCKET` |
+| **MCP module missing** | `git submodule update --init --recursive` |
+| **KeyError: PROJECT_ID** | Check `.env` exists and run `source .env` |
+| **Agent not in AgentSpace** | `make agentspace-verify` then `make agentspace-link-agent` |
+| **OAuth expired** | `make oauth-setup CLIENT_SECRET=client_secret.json` |
+| **Agent not responding** | Check logs: `gcloud logging tail "resource.type=aiplatform.googleapis.com/ReasoningEngine"` |
+| **SOAR connection failed** | Verify URL: `curl -I "${SOAR_URL}/api/external/v1/health"` |
 
-**Authentication Issues**
+### Quick Debug Commands
+
 ```bash
-gcloud auth application-default login
-gcloud config set project $PROJECT_ID
-gcloud auth application-default set-quota-project $PROJECT_ID
+gcloud logging tail "resource.type=aiplatform.googleapis.com/ReasoningEngine"  # Watch logs
+make agentspace-test  # Test components
 ```
 
-**Missing APIs**
+## FAQ
+
+**Can I use this without SOAR?**
+Yes. All security tool integrations are optional.
+
+**What AI models are supported?**
+Gemini 2.0 Flash (default). Configure others in `main.py`.
+
+**How do I update the agent?**
 ```bash
-gcloud services enable aiplatform.googleapis.com storage.googleapis.com
+git pull && make agent-engine-deploy && make agentspace-update
 ```
 
-**MCP Tools Not Working**
-```bash
-git submodule update --init --recursive
-```
+**What are the costs?**
+Vertex AI charges per API call. Security products require separate licensing.
+
+## Best Practices
+
+- **Security**: Use Secret Manager for credentials, enable audit logging, apply least-privilege IAM
+- **Development**: Separate dev/staging/prod projects, version control all configuration
+- **Operations**: Set budget alerts, backup configurations, monitor quotas
 
 ## Documentation
 
-- [Deployment Workflow](docs/DEPLOYMENT_WORKFLOW.md)
-- [Env Vars walkthrought](docs/ENVIRONMENT_VARIABLES_FLOW.md) - Which env vars are defined when
-- [Deployment Guide](DEPLOYMENT_GUIDE.md) - Complete deployment instructions
-- [PRD on Env Vars](PRD_ENV_VARS.md) - Product requirements and specifications for env vars
-- [PRD on Makefile](PRD_MAKE_TARGETS.md) - Product requirements and specifications for Makefile targets
 - [MCP Security Docs](mcp-security/README.md) - Security tool documentation
+- [Google Vertex AI Docs](https://cloud.google.com/vertex-ai/docs) - Platform documentation
+- [MCP Protocol](https://modelcontextprotocol.io/) - Protocol specification
 
 ## Support
 
+### Getting Help
 - [GitHub Issues](https://github.com/dandye/agentic_soc_agentspace/issues) - Report bugs or request features
+- [Stack Overflow](https://stackoverflow.com/questions/tagged/vertex-ai) - Community support
+- [Google Cloud Support](https://console.cloud.google.com/support) - Production issues
+
+### Resources
 - [Vertex AI Docs](https://cloud.google.com/vertex-ai/docs) - Google Cloud documentation
 - [MCP Protocol](https://modelcontextprotocol.io/) - Model Context Protocol specification
+- [Chronicle Docs](https://cloud.google.com/chronicle/docs) - SIEM documentation
+- [Security Command Center](https://cloud.google.com/security-command-center/docs) - Cloud security docs
 
