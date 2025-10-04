@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
@@ -15,38 +17,43 @@ from vertexai.preview.reasoning_engines import AdkApp
 from vertexai.preview import rag
 
 load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"), override=True)
-DEBUG = os.environ.get("DEBUG", False)
+
+# Debug mode configuration
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 if DEBUG:
   os.environ['GRPC_VERBOSITY'] = 'DEBUG'
   os.environ['GRPC_TRACE'] = 'all'
-  import logging
   logging.basicConfig(level=logging.DEBUG)
   logging.getLogger('google').setLevel(logging.DEBUG)
   logging.getLogger('google.auth').setLevel(logging.DEBUG)
   logging.getLogger('google.api_core').setLevel(logging.DEBUG)
 
-CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]  # uuid4
-CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]  # str
-CHRONICLE_REGION = os.environ["CHRONICLE_REGION"]  # typically us
-# DATASTORE_PATH = os.environ["DATASTORE_PATH"]  # disabled while researching
-GOOGLE_GENAI_USE_VERTEXAI = os.environ["GOOGLE_GENAI_USE_VERTEXAI"]  # bool; must be True when using RAG
-LOCATION = os.environ["LOCATION"]  # us-central1, ...
-PROJECT_ID = os.environ["PROJECT_ID"]  # str; likely same as CHRONICLE_PROJECT_ID
-# PROJECT_NUMBER = os.environ["PROJECT_NUMBER"]  # env vars need rationalization
+# Google Cloud Platform - Core Configuration
+GCP_PROJECT_ID = os.environ["GCP_PROJECT_ID"]  # string; GCP project ID
+GCP_LOCATION = os.environ["GCP_LOCATION"]  # string; GCP region (us-central1, us-east4, etc.)
+GCP_STAGING_BUCKET = os.environ["GCP_STAGING_BUCKET"]  # string; gs://bucket-name
+GCP_VERTEXAI_ENABLED = os.environ["GCP_VERTEXAI_ENABLED"]  # bool string; must be "True" for RAG
 
+# Chronicle SIEM Configuration
+CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]  # uuid4; Chronicle customer UUID
+CHRONICLE_REGION = os.environ.get("CHRONICLE_REGION", "us")  # string; Chronicle region (us, europe, asia)
+CHRONICLE_SERVICE_ACCOUNT_PATH = os.environ["CHRONICLE_SERVICE_ACCOUNT_PATH"]  # abs path; SA JSON file
+
+# SOAR Platform Configuration
+SOAR_URL = os.environ["SOAR_URL"]  # string; https://[YOUR-ID].siemplify-soar.com:443
+SOAR_API_KEY = os.environ["SOAR_API_KEY"]  # uuid4; SOAR authentication key
+
+# Google Threat Intelligence (VirusTotal) Configuration
+GTI_API_KEY = os.environ["GTI_API_KEY"]  # string; VirusTotal API key
+
+# RAG Corpus Configuration
 # NOTE: location us-central1 needs allowlist, so us-east4 or other location is recommended
-RAG_CORPUS = os.environ["RAG_CORPUS"]  # "projects/${PROJECT_NUMBER}/locations/[location]/ragCorpora/[numeric]"
+RAG_CORPUS_NAME = os.environ["RAG_CORPUS_NAME"]  # string; full RAG corpus resource name
+RAG_SIMILARITY_TOP_K = int(os.environ.get("RAG_SIMILARITY_TOP_K", "10"))  # int; number of docs to retrieve
+RAG_DISTANCE_THRESHOLD = float(os.environ.get("RAG_DISTANCE_THRESHOLD", "0.6"))  # float; similarity threshold
 
-SOAR_URL = os.environ["SOAR_URL"]  # contains https://[YOUR-ID].siemplify-soar.com:443
-SOAR_APP_KEY = os.environ["SOAR_APP_KEY"]  # uuid4
-STAGING_BUCKET = os.environ["STAGING_BUCKET"]  # "gs://[your-globally-unique-name]"
-VT_APIKEY = os.environ["VT_APIKEY"]  # str  ToDo: move to Secret Manager
-# ToDo: move to Secret Manager
-SECOPS_SA_PATH = os.environ["SECOPS_SA_PATH"]  # abs path to your service account with auth for Chronicle REST API
-
-service_account_path = Path(SECOPS_SA_PATH)
-_ = service_account_path.parent  # for reference
+service_account_path = Path(CHRONICLE_SERVICE_ACCOUNT_PATH)
 service_account_filename = service_account_path.name
 
 secops_siem_tools = McpToolset(
@@ -59,11 +66,10 @@ secops_siem_tools = McpToolset(
               "server.py",
       ],
       env = {
-        "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
+        "CHRONICLE_PROJECT_ID": GCP_PROJECT_ID,  # MCP server expects this name
         "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
         "CHRONICLE_REGION": CHRONICLE_REGION,
-         # packaged app will expect this in same dir as server.py
-        "SECOPS_SA_PATH": service_account_filename  # ToDo: move to Secret Mgr
+        "SECOPS_SA_PATH": service_account_filename  # MCP server expects this name; packaged app will find file in same dir
       }
     ),
     timeout=60000
@@ -82,7 +88,7 @@ secops_soar_tools = McpToolset(
         ],
         env = {
           "SOAR_URL": SOAR_URL,
-          "SOAR_APP_KEY": SOAR_APP_KEY
+          "SOAR_APP_KEY": SOAR_API_KEY  # MCP server expects SOAR_APP_KEY name
        },
     ),
     timeout=60000
@@ -101,7 +107,7 @@ gti_tools = McpToolset(
                 "server.py",
         ],
         env = {
-          "VT_APIKEY": VT_APIKEY,
+          "VT_APIKEY": GTI_API_KEY,  # MCP server expects VT_APIKEY name
       }
     ),
     timeout=60000
@@ -151,11 +157,11 @@ ask_vertex_retrieval = VertexAiRagRetrieval(
     ),
     rag_resources=[
         rag.RagResource(
-            rag_corpus=RAG_CORPUS,
+            rag_corpus=RAG_CORPUS_NAME,
         )
     ],
-    similarity_top_k=10,
-    vector_distance_threshold=0.6,
+    similarity_top_k=RAG_SIMILARITY_TOP_K,
+    vector_distance_threshold=RAG_DISTANCE_THRESHOLD,
 )
 
 root_agent = Agent(
@@ -196,13 +202,13 @@ Always provide actionable guidance combining documented procedures with live sec
 )
 
 vertexai.init(
-    project=PROJECT_ID,
-    location=LOCATION,
-    staging_bucket=STAGING_BUCKET,
+    project=GCP_PROJECT_ID,
+    location=GCP_LOCATION,
+    staging_bucket=GCP_STAGING_BUCKET,
 )
 
 # copy the JSON SA file to the same dir as server.py; ToDo: move to Secret Mgr
-shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/secops/secops_mcp/")
+shutil.copy(CHRONICLE_SERVICE_ACCOUNT_PATH, "./mcp-security/server/secops/secops_mcp/")
 # puts file into agent_engine_dependencies.tar.gz to record state of build (not used as code)
 shutil.copy("main.py", "./mcp-security/server/main.txt")
 # shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/vertex-search/")  # disabled while researching
@@ -238,25 +244,22 @@ remote_app = agent_engines.create(
      "installation_scripts/install.sh",
   ],
   env_vars={
-    "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
+    "CHRONICLE_PROJECT_ID": GCP_PROJECT_ID,  # MCP servers expect legacy names
     "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
     "CHRONICLE_REGION": CHRONICLE_REGION,
-    # "DATASTORE_PATH": DATASTORE_PATH,
-    "GOOGLE_GENAI_USE_VERTEXAI": GOOGLE_GENAI_USE_VERTEXAI,  # required for RAG
-    "LOCATION": LOCATION,
-    "PROJECT_ID": PROJECT_ID,
-    "RAG_CORPUS": RAG_CORPUS,
+    "GOOGLE_GENAI_USE_VERTEXAI": GCP_VERTEXAI_ENABLED,  # required for RAG
+    "LOCATION": GCP_LOCATION,
+    "PROJECT_ID": GCP_PROJECT_ID,
+    "RAG_CORPUS": RAG_CORPUS_NAME,
     "SOAR_URL": SOAR_URL,
-    "SOAR_APP_KEY": SOAR_APP_KEY,
-    "VT_APIKEY": VT_APIKEY,
+    "SOAR_APP_KEY": SOAR_API_KEY,
+    "VT_APIKEY": GTI_API_KEY,
   }
 )
 
 #
 # Test agent
 #
-import asyncio
-
 async def async_test(remote_app):
   user_id = "Dan"
   session = await remote_app.async_create_session(user_id=user_id)

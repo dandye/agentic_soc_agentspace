@@ -6,7 +6,6 @@ This script manages AgentSpace operations including registration, updates,
 verification, and deletion of agents in AgentSpace.
 """
 
-import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -24,6 +23,7 @@ app = typer.Typer(
 )
 
 DISCOVERY_ENGINE_API_BASE = "https://discoveryengine.googleapis.com/v1alpha"
+# Note: Using v1alpha as per notebook example, though agents endpoint may not exist for all apps
 
 
 class AgentSpaceManager:
@@ -89,11 +89,11 @@ class AgentSpaceManager:
     def _validate_environment(self) -> Tuple[bool, list]:
         """Validate required environment variables for AgentSpace operations."""
         required_vars = [
-            "AGENTSPACE_PROJECT_ID",
-            "AGENTSPACE_PROJECT_NUMBER",
+            "GCP_PROJECT_ID",
+            "GCP_PROJECT_NUMBER",
             "AGENTSPACE_APP_ID",
             "AGENT_ENGINE_RESOURCE_NAME",
-            "GOOGLE_CLOUD_LOCATION",
+            "GCP_LOCATION",
         ]
         missing = [var for var in required_vars if not self.env_vars.get(var)]
         return not missing, missing
@@ -109,7 +109,7 @@ class AgentSpaceManager:
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
-            "X-Goog-User-Project": self.env_vars.get("AGENTSPACE_PROJECT_ID", self.env_vars.get("PROJECT_ID")),
+            "X-Goog-User-Project": self.env_vars["GCP_PROJECT_NUMBER"],
         }
         headers.update(kwargs.pop("headers", {}))
 
@@ -125,7 +125,7 @@ class AgentSpaceManager:
 
     def _get_agent_api_url(self, agent_id: Optional[str] = None) -> str:
         """Construct the API URL for AgentSpace agents."""
-        project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
         assistant = self.env_vars.get("AGENTSPACE_ASSISTANT", "default_assistant")
@@ -162,8 +162,10 @@ class AgentSpaceManager:
         }
         if oauth_auth_id := self.env_vars.get("OAUTH_AUTH_ID"):
             config["adk_agent_definition"]["authorizations"] = [
-                f"projects/{self.env_vars['AGENTSPACE_PROJECT_NUMBER']}/locations/global/authorizations/{oauth_auth_id}"
+                f"projects/{self.env_vars['GCP_PROJECT_NUMBER']}/locations/global/authorizations/{oauth_auth_id}"
             ]
+        else:
+            config["adk_agent_definition"]["authorizations"] = []
         return config
 
     def register_agent(self, force: bool = False) -> bool:
@@ -187,7 +189,24 @@ class AgentSpaceManager:
         api_url = self._get_agent_api_url()
         agent_config = self._build_agent_config()
 
-        response = self._make_request("POST", api_url, json=agent_config)
+        access_token = self._get_access_token()
+        if not access_token:
+            return False
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "X-Goog-User-Project": self.env_vars["GCP_PROJECT_NUMBER"],
+        }
+
+        try:
+            response = requests.post(api_url, headers=headers, json=agent_config)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            typer.secho(f" API request failed: {e}", fg=typer.colors.RED)
+            if e.response is not None:
+                typer.echo(f"  Response: {e.response.text}")
+            return False
         if response and response.status_code == 200:
             result = response.json()
             agent_name = result.get("name", "")
@@ -263,9 +282,113 @@ class AgentSpaceManager:
             return True
         return False
 
+    def create_app(
+        self,
+        app_name: Optional[str] = None,
+        solution_type: str = "SOLUTION_TYPE_SEARCH",
+        data_store_ids: Optional[list] = None,
+        enable_chat: bool = False,
+    ) -> bool:
+        """
+        Create a new AgentSpace app (engine) in Discovery Engine.
+        
+        Args:
+            app_name: Name for the app (will be used to generate app_id)
+            solution_type: Type of solution (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT, etc.)
+            data_store_ids: List of data store IDs to associate with the app
+            enable_chat: Whether to enable chat features (requires Dialogflow API)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        typer.echo("Creating new AgentSpace app...")
+        
+        # Validate required environment variables
+        required_vars = ["GCP_PROJECT_NUMBER", "GCP_PROJECT_ID"]
+        missing = [var for var in required_vars if not self.env_vars.get(var)]
+        if missing:
+            typer.secho(
+                f" Missing required variables: {', '.join(missing)}",
+                fg=typer.colors.RED,
+            )
+            return False
+        
+        # Generate app ID with timestamp
+        import time
+        if not app_name:
+            app_name = "agentic-soc-app"
+        app_id = f"{app_name.lower().replace(' ', '-')}_{int(time.time())}"
+        
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+        
+        # Build the API URL
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines"
+        )
+        
+        # Build the app configuration
+        app_config = {
+            "displayName": app_name,
+            "solutionType": solution_type,
+        }
+        
+        # Add data stores if provided
+        if data_store_ids:
+            app_config["dataStoreIds"] = data_store_ids
+        elif solution_type == "SOLUTION_TYPE_CHAT":
+            # Chat apps require at least one data store
+            typer.secho(
+                " Warning: SOLUTION_TYPE_CHAT requires at least one data store",
+                fg=typer.colors.YELLOW,
+            )
+            return False
+        
+        # Add chat configuration if enabled
+        if enable_chat and solution_type == "SOLUTION_TYPE_CHAT":
+            app_config["chatEngineConfig"] = {
+                "agentCreationConfig": {
+                    "business": self.env_vars.get("AGENT_BUSINESS", "Security Operations"),
+                    "defaultLanguageCode": self.env_vars.get("AGENT_LANGUAGE", "en"),
+                    "timeZone": self.env_vars.get("AGENT_TIMEZONE", "America/New_York"),
+                }
+            }
+        
+        # Make the API request
+        typer.echo(f"  Creating app with ID: {app_id}")
+        typer.echo(f"  Solution type: {solution_type}")
+        
+        response = self._make_request(
+            "POST",
+            url,
+            json=app_config,
+            params={"engineId": app_id}
+        )
+        
+        if response and response.status_code in [200, 201]:
+            typer.secho(" App created successfully!", fg=typer.colors.GREEN)
+            typer.echo(f"  App ID: {app_id}")
+            typer.echo(f"  Display Name: {app_name}")
+            
+            # Update environment file with new app ID
+            self._update_env_var("AGENTSPACE_APP_ID", app_id)
+            
+            typer.echo("\n" + "=" * 80)
+            typer.echo("IMPORTANT: Save this app ID to your .env file:")
+            typer.echo(f"AGENTSPACE_APP_ID={app_id}")
+            typer.echo("=" * 80)
+            
+            return True
+        else:
+            typer.secho(" Failed to create app", fg=typer.colors.RED)
+            if response and hasattr(response, 'text'):
+                typer.echo(f"  Response: {response.text}")
+            return False
+
     def display_url(self) -> None:
         """Display AgentSpace UI URL."""
-        project_id = self.env_vars.get("AGENTSPACE_PROJECT_ID")
+        project_id = self.env_vars.get("GCP_PROJECT_ID")
         app_id = self.env_vars.get("AGENTSPACE_APP_ID")
         if not all([project_id, app_id]):
             typer.secho(" Cannot generate URL - missing configuration.", fg=typer.colors.RED)
@@ -279,7 +402,7 @@ class AgentSpaceManager:
 
     def _ensure_data_store_exists(self) -> bool:
         """Ensure the engine has at least one data store configured."""
-        project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
 
@@ -327,7 +450,7 @@ class AgentSpaceManager:
 
     def _create_website_datastore(self) -> bool:
         """Create an unstructured data store for search."""
-        project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
 
@@ -437,7 +560,7 @@ class AgentSpaceManager:
         if not auth_id:
             auth_id = self.env_vars.get("OAUTH_AUTH_ID")
 
-        project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         as_app = self.env_vars["AGENTSPACE_APP_ID"]
         reasoning_engine = self.env_vars["AGENT_ENGINE_RESOURCE_NAME"]
 
@@ -447,6 +570,7 @@ class AgentSpaceManager:
             return False
 
         url = f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/locations/global/collections/default_collection/engines/{as_app}/assistants/default_assistant/agents"
+
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -480,7 +604,7 @@ class AgentSpaceManager:
             result = response.json()
             agent_name = result.get("name", "")
 
-            typer.echo(f"Successfully linked agent to AgentSpace!")
+            typer.echo("Successfully linked agent to AgentSpace!")
             typer.echo(f"Agent name: {agent_name}")
 
             # Extract and save agent ID if present
@@ -493,6 +617,88 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error linking agent to AgentSpace: {e}", err=True)
+            if hasattr(e.response, 'text'):
+                typer.echo(f"Response: {e.response.text}", err=True)
+            return False
+
+    def unlink_agent_from_agentspace(
+        self,
+        agent_id: Optional[str] = None,
+        force: bool = False,
+    ) -> bool:
+        """
+        Unlink (remove) an agent from AgentSpace while keeping the app intact.
+
+        Args:
+            agent_id: ID of the agent to unlink (defaults to AGENTSPACE_AGENT_ID from env)
+            force: Skip confirmation prompt if True
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # Get agent ID from parameter or environment
+        if not agent_id:
+            agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
+
+        if not agent_id:
+            typer.secho(" No agent ID found to unlink.", fg=typer.colors.RED)
+            return False
+
+        # Validate required environment variables
+        required_vars = ["GCP_PROJECT_NUMBER", "AGENTSPACE_APP_ID"]
+        missing = [var for var in required_vars if not self.env_vars.get(var)]
+        if missing:
+            typer.secho(
+                f" Missing required variables: {', '.join(missing)}",
+                fg=typer.colors.RED,
+            )
+            return False
+
+        # Confirm deletion unless force flag is set
+        if not force and not typer.confirm(
+            f"Are you sure you want to unlink agent {agent_id} from AgentSpace?"
+        ):
+            typer.echo("Cancelled.")
+            return False
+
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
+        as_app = self.env_vars["AGENTSPACE_APP_ID"]
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+        assistant = self.env_vars.get("AGENTSPACE_ASSISTANT", "default_assistant")
+
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines/{as_app}/"
+            f"assistants/{assistant}/agents/{agent_id}"
+        )
+
+        access_token = self._get_access_token()
+        if not access_token:
+            typer.echo("Error: Failed to get access token", err=True)
+            return False
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Goog-User-Project": project_number,
+        }
+
+        try:
+            response = requests.delete(url, headers=headers)
+            response.raise_for_status()
+
+            typer.secho(" Agent unlinked successfully from AgentSpace!", fg=typer.colors.GREEN)
+            typer.echo(f"  Agent ID {agent_id} removed from app {as_app}")
+            typer.echo("  Note: The AgentSpace app remains intact")
+
+            # Clear agent ID from environment if it matches
+            if agent_id == self.env_vars.get("AGENTSPACE_AGENT_ID"):
+                self._update_env_var("AGENTSPACE_AGENT_ID", "")
+                typer.echo("  Cleared AGENTSPACE_AGENT_ID from environment")
+
+            return True
+
+        except requests.exceptions.RequestException as e:
+            typer.echo(f"Error unlinking agent from AgentSpace: {e}", err=True)
             if hasattr(e.response, 'text'):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
@@ -522,9 +728,9 @@ class AgentSpaceManager:
                 typer.echo("Error: No agent ID provided or found in environment", err=True)
                 return False
 
-        project_number = self.env_vars.get("AGENTSPACE_PROJECT_NUMBER")
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
         if not project_number:
-            typer.echo("Error: AGENTSPACE_PROJECT_NUMBER not found in environment", err=True)
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
             return False
 
         as_app = self.env_vars.get("AGENTSPACE_APP_ID")
@@ -575,7 +781,7 @@ class AgentSpaceManager:
             response = requests.patch(url, headers=headers, json=data, params=params)
             response.raise_for_status()
 
-            typer.echo(f"Successfully updated agent configuration!")
+            typer.echo("Successfully updated agent configuration!")
             return True
 
         except requests.exceptions.RequestException as e:
@@ -591,9 +797,9 @@ class AgentSpaceManager:
         Returns:
             True if successful, False otherwise
         """
-        project_number = self.env_vars.get("AGENTSPACE_PROJECT_NUMBER")
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
         if not project_number:
-            typer.echo("Error: AGENTSPACE_PROJECT_NUMBER not found in environment", err=True)
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
             return False
 
         as_app = self.env_vars.get("AGENTSPACE_APP_ID")
@@ -661,7 +867,7 @@ class AgentSpaceManager:
         typer.echo(f"Testing AgentSpace search with query: '{query}'...")
 
         # Validate required environment variables
-        required_vars = ["AGENTSPACE_PROJECT_NUMBER", "AGENTSPACE_APP_ID"]
+        required_vars = ["GCP_PROJECT_NUMBER", "AGENTSPACE_APP_ID"]
         missing = [var for var in required_vars if not self.env_vars.get(var)]
         if missing:
             typer.secho(
@@ -675,7 +881,7 @@ class AgentSpaceManager:
             typer.secho(" Cannot search without a data store", fg=typer.colors.RED)
             return False
 
-        project_number = self.env_vars["AGENTSPACE_PROJECT_NUMBER"]
+        project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
 
@@ -740,7 +946,7 @@ def register(
     ] = False,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Register the agent with AgentSpace."""
     manager = AgentSpaceManager(env_file)
@@ -752,7 +958,7 @@ def register(
 def update(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Update the existing AgentSpace agent configuration."""
     manager = AgentSpaceManager(env_file)
@@ -764,7 +970,7 @@ def update(
 def verify(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Verify the AgentSpace agent configuration and status."""
     manager = AgentSpaceManager(env_file)
@@ -779,7 +985,7 @@ def delete(
     ] = False,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Delete the agent from AgentSpace."""
     manager = AgentSpaceManager(env_file)
@@ -791,7 +997,7 @@ def delete(
 def url(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Display the AgentSpace UI URL."""
     manager = AgentSpaceManager(env_file)
@@ -805,7 +1011,7 @@ def search(
     ] = "test security operations",
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Test AgentSpace search functionality via Discovery Engine API."""
     manager = AgentSpaceManager(env_file)
@@ -817,7 +1023,7 @@ def search(
 def ensure_datastore(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Ensure the AgentSpace engine has a data store configured."""
     manager = AgentSpaceManager(env_file)
@@ -841,11 +1047,29 @@ def link_agent(
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Link an existing agent engine to AgentSpace with OAuth authorization."""
     manager = AgentSpaceManager(env_file)
     if not manager.link_agent_to_agentspace(display_name, description, tool_description, auth_id):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def unlink_agent(
+    agent_id: Annotated[
+        Optional[str], typer.Option("--agent-id", help="ID of the agent to unlink (defaults to env var).")
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Force unlinking without confirmation.")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """Unlink (remove) an agent from AgentSpace while keeping the app intact."""
+    manager = AgentSpaceManager(env_file)
+    if not manager.unlink_agent_from_agentspace(agent_id, force):
         raise typer.Exit(code=1)
 
 
@@ -865,7 +1089,7 @@ def update_agent_config(
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """Update an existing agent's configuration in AgentSpace."""
     manager = AgentSpaceManager(env_file)
@@ -877,11 +1101,44 @@ def update_agent_config(
 def list_agents(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
-    ] = Path("google_mcp_security_agent/.env"),
+    ] = Path(".env"),
 ) -> None:
     """List all agents in the AgentSpace app."""
     manager = AgentSpaceManager(env_file)
     if not manager.list_agents():
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def create_app(
+    app_name: Annotated[
+        Optional[str], typer.Option("--name", help="Display name for the app.")
+    ] = None,
+    solution_type: Annotated[
+        str, typer.Option("--type", help="Solution type (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT).")
+    ] = "SOLUTION_TYPE_SEARCH",
+    data_store_id: Annotated[
+        Optional[str], typer.Option("--data-store", help="Data store ID to associate with the app.")
+    ] = None,
+    enable_chat: Annotated[
+        bool, typer.Option("--enable-chat", help="Enable chat features (requires Dialogflow API for CHAT type).")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """Create a new AgentSpace app in Discovery Engine."""
+    manager = AgentSpaceManager(env_file)
+    
+    # Convert single data store ID to list if provided
+    data_store_ids = [data_store_id] if data_store_id else None
+    
+    if not manager.create_app(
+        app_name=app_name,
+        solution_type=solution_type,
+        data_store_ids=data_store_ids,
+        enable_chat=enable_chat
+    ):
         raise typer.Exit(code=1)
 
 
