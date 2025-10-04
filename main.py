@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 from pathlib import Path
@@ -6,34 +5,51 @@ import shutil
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
-from google.adk.tools import VertexAiSearchTool
+from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrieval
 from mcp import StdioServerParameters
 import vertexai
 from vertexai import agent_engines
+from vertexai.preview.reasoning_engines import AdkApp
+from vertexai.preview import rag
 
 load_dotenv(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env"), override=True)
+DEBUG = os.environ.get("DEBUG", False)
 
-CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]
-CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]
-CHRONICLE_REGION = os.environ["CHRONICLE_REGION"]
-DATASTORE_PATH = os.environ["DATASTORE_PATH"]
-LOCATION = os.environ["LOCATION"]
-PROJECT_ID = os.environ["PROJECT_ID"]
-PROJECT_NUMBER = os.environ["PROJECT_NUMBER"]
-SOAR_URL = os.environ["SOAR_URL"]
-SOAR_APP_KEY = os.environ["SOAR_APP_KEY"]
-STAGING_BUCKET = os.environ["STAGING_BUCKET"]
-VT_APIKEY = os.environ["VT_APIKEY"]
-SECOPS_SA_PATH = os.environ["SECOPS_SA_PATH"]
+if DEBUG:
+  os.environ['GRPC_VERBOSITY'] = 'DEBUG'
+  os.environ['GRPC_TRACE'] = 'all'
+  import logging
+  logging.basicConfig(level=logging.DEBUG)
+  logging.getLogger('google').setLevel(logging.DEBUG)
+  logging.getLogger('google.auth').setLevel(logging.DEBUG)
+  logging.getLogger('google.api_core').setLevel(logging.DEBUG)
 
+CHRONICLE_CUSTOMER_ID = os.environ["CHRONICLE_CUSTOMER_ID"]  # uuid4
+CHRONICLE_PROJECT_ID = os.environ["CHRONICLE_PROJECT_ID"]  # str
+CHRONICLE_REGION = os.environ["CHRONICLE_REGION"]  # typically us
+# DATASTORE_PATH = os.environ["DATASTORE_PATH"]  # disabled while researching
+GOOGLE_GENAI_USE_VERTEXAI = os.environ["GOOGLE_GENAI_USE_VERTEXAI"]  # bool; must be True when using RAG
+LOCATION = os.environ["LOCATION"]  # us-central1, ...
+PROJECT_ID = os.environ["PROJECT_ID"]  # str; likely same as CHRONICLE_PROJECT_ID
+# PROJECT_NUMBER = os.environ["PROJECT_NUMBER"]  # env vars need rationalization
+
+# NOTE: location us-central1 needs allowlist, so us-east4 or other location is recommended
+RAG_CORPUS = os.environ["RAG_CORPUS"]  # "projects/${PROJECT_NUMBER}/locations/[location]/ragCorpora/[numeric]"
+
+SOAR_URL = os.environ["SOAR_URL"]  # contains https://[YOUR-ID].siemplify-soar.com:443
+SOAR_APP_KEY = os.environ["SOAR_APP_KEY"]  # uuid4
+STAGING_BUCKET = os.environ["STAGING_BUCKET"]  # "gs://[your-globally-unique-name]"
+VT_APIKEY = os.environ["VT_APIKEY"]  # str  ToDo: move to Secret Manager
+# ToDo: move to Secret Manager
+SECOPS_SA_PATH = os.environ["SECOPS_SA_PATH"]  # abs path to your service account with auth for Chronicle REST API
 
 service_account_path = Path(SECOPS_SA_PATH)
-_ = service_account_path.parent
+_ = service_account_path.parent  # for reference
 service_account_filename = service_account_path.name
 
-secops_siem_tools = MCPToolset(
+secops_siem_tools = McpToolset(
   connection_params=StdioConnectionParams(
     server_params=StdioServerParameters(
       command='uv',
@@ -46,16 +62,16 @@ secops_siem_tools = MCPToolset(
         "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
         "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
         "CHRONICLE_REGION": CHRONICLE_REGION,
-         # packged app will expect this in same dir as server.py
-        "SECOPS_SA_PATH": service_account_filename
+         # packaged app will expect this in same dir as server.py
+        "SECOPS_SA_PATH": service_account_filename  # ToDo: move to Secret Mgr
       }
     ),
-    timeout=60
+    timeout=60000
   ),
   errlog=None
 )
 
-secops_soar_tools = MCPToolset(
+secops_soar_tools = McpToolset(
     connection_params=StdioConnectionParams(
       server_params=StdioServerParameters(
         command='uv',
@@ -69,13 +85,13 @@ secops_soar_tools = MCPToolset(
           "SOAR_APP_KEY": SOAR_APP_KEY
        },
     ),
-    timeout=60
+    timeout=60000
   ),
   #tool_set_name="secops_soar_mcp",
   errlog=None
 )
 
-gti_tools = MCPToolset(
+gti_tools = McpToolset(
     connection_params=StdioConnectionParams(
       server_params=StdioServerParameters(
         command='uv',
@@ -88,12 +104,12 @@ gti_tools = MCPToolset(
           "VT_APIKEY": VT_APIKEY,
       }
     ),
-    timeout=60
+    timeout=60000
   ),
   errlog=None
 )
 
-scc_tools = MCPToolset(
+scc_tools = McpToolset(
     connection_params=StdioConnectionParams(
       server_params=StdioServerParameters(
         command='uv',
@@ -104,68 +120,79 @@ scc_tools = MCPToolset(
         ],
         env = {},
     ),
-    timeout=600
+    timeout=60000
   ),
   errlog=None
 )
 
-# Tool Instantiation
-# You MUST provide your datastore ID here.
-vertex_search_tool = VertexAiSearchTool(data_store_id=DATASTORE_PATH)
 
-vertex_search_agent = Agent(
-  model="gemini-2.5-flash",
-  name="vertex_search_agent",
-  description="Specialized agent for searching Security Operations runbooks, procedures, and documentation stored in Google Drive.",
-  instruction="""You are a specialized documentation search agent for Security Operations.
+# Vertex Search MCP Tool (disabled while researching)
+#  Update: this works for search but cannot retrieve the doc *content*
+#  vertex_search_tools = McpToolset(
+#    connection_params=StdioConnectionParams(
+#      server_params=StdioServerParameters(
+#        command='python',
+#        args=["./mcp-security/server/vertex-search/vertex_search_mcp.py", "--env-file", ".env"],
+#        env = {
+#          "DATASTORE_PATH": DATASTORE_PATH,
+#          "SECOPS_SA_PATH": service_account_filename,  # Pass filename only, will be in same dir
+#          "APPLICATION_DEFAULT_CREDENTIALS": os.path.expanduser("~/.config/gcloud/application_default_credentials.json"),
+#        }
+#      ),
+#      timeout=60000
+#    ),
+#    errlog=None
+#  )
 
-YOUR ROLE:
-- Search through Security Operations runbooks, procedures, and guidelines in Google Drive
-- Find relevant step-by-step instructions, best practices, and documented procedures
-- Extract specific guidance for security workflows and incident response
-
-SEARCH STRATEGY:
-1. Use specific keywords related to the user's security question
-2. Look for procedures, runbooks, and guidelines that match the request
-3. Provide detailed excerpts from relevant documentation
-4. Include document names/sources when possible
-
-RETURN PROTOCOL:
-- Always provide your findings in a structured format
-- Include relevant quotes and specific steps from the documentation
-- If no exact match found, suggest related procedures or general guidance
-- End with "Search complete - returning to root agent for additional security tool integration"
-
-Focus on finding actionable documentation that the root agent can combine with live security data.""",
-  tools=[
-     vertex_search_tool,
-  ]
+ask_vertex_retrieval = VertexAiRagRetrieval(
+    name='retrieve_agentic_soc_runbooks',
+    description=(
+      "Use this tool to retrieve IRPs, Runbooks, Common Steps, and Personas for the Agentic SOC."
+    ),
+    rag_resources=[
+        rag.RagResource(
+            rag_corpus=RAG_CORPUS,
+        )
+    ],
+    similarity_top_k=10,
+    vector_distance_threshold=0.6,
 )
 
 root_agent = Agent(
-  model="gemini-2.5-flash",
+  model="gemini-2.5-flash",  # Fixed: using current model, -exp is deprecated
   name="root_assistant",
-  description="Security Operations reasoning agent with access to SOAR tools.",
-  instruction="""You are a Security Operations assistant with access to MCP security tools and a specialized sub-agent for runbook searches.
+  description="Security Operations reasoning agent with access to Agentic SOC MCP tools and runbook search.",
+  instruction="""You are a Security Operations assistant with comprehensive access to MCP security tools including RAG-based runbook and documentation retrieval.
 
-DELEGATION RULES:
-- When users ask about runbooks, procedures, guidelines, or need to search documentation, delegate to the vertex_search_agent
-- When users ask for Chronicle/SIEM queries, threat intelligence, SOAR cases, or SCC findings, handle directly with your MCP tools
-- After delegation, review the sub-agent's response and provide additional context or follow-up actions using your security tools if needed
+YOUR CAPABILITIES:
+- Retrieve security Runbooks, IRPs, Common Steps, Procedures, guidelines, and personas using retrieve_agentic_soc_runbooks tool
+- Query Chronicle/SIEM for security events and detections
+- Manage SOAR cases and incidents
+- Access threat intelligence through GTI tools
+- Retrieve SCC findings and cloud security posture
+- Use list_tools to get full MCP Tool list
 
-COMMUNICATION PATTERN:
-1. If the request involves searching runbooks/procedures: "I'll search our runbooks for that information" → delegate to vertex_search_agent
-2. Review sub-agent results and enhance with relevant security tool actions
-3. Provide comprehensive response combining runbook guidance with live security data
+WORKFLOW:
+1. When users ask about runbooks or procedures, use the retrieve_agentic_soc_runbooks tool to retrieve relevant documentation from the RAG corpus
+2. For security investigations, combine runbook guidance with live data from Chronicle, GTI, and SOAR
+3. Provide comprehensive responses that integrate procedural knowledge with real-time security data
 
-Use your MCP tools for real-time security operations and delegate documentation searches to ensure complete responses.""",
+KEY TOOLS:
+- retrieve_agentic_soc_runbooks: Retrieve security procedures and documentation from the RAG corpus
+- Chronicle tools: Query SIEM for security events
+- SOAR tools: Manage cases and incidents
+- GTI tools: Get threat intelligence
+- SCC tools: Cloud security findings
+
+Always provide actionable guidance combining documented procedures with live security data.""",
   tools=[
      secops_soar_tools,
      secops_siem_tools,
      gti_tools,
      scc_tools,
-  ],
-  sub_agents=[vertex_search_agent]
+     # vertex_search_tools,
+     ask_vertex_retrieval,
+  ]
 )
 
 vertexai.init(
@@ -174,44 +201,86 @@ vertexai.init(
     staging_bucket=STAGING_BUCKET,
 )
 
-# copy the JSON SA file to the same dir as server.py
+# copy the JSON SA file to the same dir as server.py; ToDo: move to Secret Mgr
 shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/secops/secops_mcp/")
+# puts file into agent_engine_dependencies.tar.gz to record state of build (not used as code)
+shutil.copy("main.py", "./mcp-security/server/main.txt")
+# shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/vertex-search/")  # disabled while researching
+
+def session_service_builder():
+  from google.adk.sessions import InMemorySessionService
+  return InMemorySessionService()
+
+# Create AdkApp instance
+app = AdkApp(
+    agent=root_agent,
+    # When InMemorySessionService is NOT used in Agentspace: Exception: Cannot send a request, as the client has been closed. (so it MUST be used)
+    session_service_builder=session_service_builder,
+    enable_tracing=True,
+)
 
 remote_app = agent_engines.create(
+  app,
   display_name="Agentic SOC Agent Engine",
-  description="Instance of Agent Engine for the Agentic SOC.",
+  requirements=[
+    "cloudpickle",
+    #"google-adk>=1.15.1",  # _claims_ to fix AttributeError: 'LlmAgent' object has no attribute 'static_instruction'. Did you mean: 'global_instruction' (but no joy)
+    "google-adk==1.14.1",  # known-woring
+    "google-genai",
+    "google-cloud-discoveryengine",
+    "google-cloud-aiplatform[agent-engines]",
+    "pydantic",
+    "python-dotenv",
+  ],
   build_options = {"installation_scripts": ["installation_scripts/install.sh"]},
   extra_packages=[
      "mcp-security/server",
      "installation_scripts/install.sh",
   ],
-  agent_engine=root_agent,
-  requirements=[
-    "cloudpickle==3.1.1",
-    "google-cloud-aiplatform[adk,agent_engines]",
-    "google-adk",
-    "google-genai",
-    "pydantic",
-    "python-dotenv",
-  ],
+  env_vars={
+    "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
+    "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
+    "CHRONICLE_REGION": CHRONICLE_REGION,
+    # "DATASTORE_PATH": DATASTORE_PATH,
+    "GOOGLE_GENAI_USE_VERTEXAI": GOOGLE_GENAI_USE_VERTEXAI,  # required for RAG
+    "LOCATION": LOCATION,
+    "PROJECT_ID": PROJECT_ID,
+    "RAG_CORPUS": RAG_CORPUS,
+    "SOAR_URL": SOAR_URL,
+    "SOAR_APP_KEY": SOAR_APP_KEY,
+    "VT_APIKEY": VT_APIKEY,
+  }
 )
 
 #
 # Test agent
 #
+import asyncio
+
 async def async_test(remote_app):
-  session = await remote_app.async_create_session(user_id="D")
-  print(f"session: {session}")
+  user_id = "Dan"
+  session = await remote_app.async_create_session(user_id=user_id)
+  print(f"session: {session.get('id')}")
+  events = []
   async for event in remote_app.async_stream_query(
-    user_id="D",
+    user_id=user_id,
     session_id=session.get("id"),
-    message="I need to investigate a potential malware incident. Please search our runbooks for incident response procedures for malware analysis, then use Chronicle to search for any recent ursnif-related security rules or detections."
-      #f" My `project_id is {CHRONICLE_PROJECT_ID} and "
-      #f" my customer_id is {CHRONICLE_CUSTOMER_ID} and "
-      #f" my region is {CHRONICLE_REGION}.",
+    message="Search RAG Corpus for Malware IRP runbook and get the objective."
+    # message="List security rules with ursnif in the name."
+    # f" My `project_id is {CHRONICLE_PROJECT_ID} and "
+    # f" my customer_id is {CHRONICLE_CUSTOMER_ID} and "
+    # f" my region is {CHRONICLE_REGION}.",
   ):
     print(f"event: {event}")
+    events.append(event)
   print("after query stream")
+  if not events:
+      print("No events received from agent!")
+  else:
+    print(f"Received {len(events)} events")
+    for event in events:
+       print(f"event: {event}")
+
 
 asyncio.run(async_test(remote_app))
 

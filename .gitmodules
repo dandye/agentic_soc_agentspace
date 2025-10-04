@@ -2,3 +2,6 @@
 	path = mcp-security
 	# url = git@github.com:google/mcp-security.git
 	url = https://github.com/google/mcp-security.git
+[submodule "adk-samples"]
+	path = adk-samples
+	url = https://github.com/google/adk-samples.git
