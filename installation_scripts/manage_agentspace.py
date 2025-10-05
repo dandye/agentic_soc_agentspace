@@ -25,6 +25,16 @@ app = typer.Typer(
 DISCOVERY_ENGINE_API_BASE = "https://discoveryengine.googleapis.com/v1alpha"
 # Note: Using v1alpha as per notebook example, though agents endpoint may not exist for all apps
 
+"""
+https://cloud.google.com/agentspace/docs/reference/rest/v1/SolutionType
+
+SOLUTION_TYPE_UNSPECIFIED	Default value.
+SOLUTION_TYPE_RECOMMENDATION	Used for Recommendations AI.
+SOLUTION_TYPE_SEARCH	Used for Discovery Search.
+SOLUTION_TYPE_CHAT	Used for use cases related to the Generative AI agent.
+SOLUTION_TYPE_GENERATIVE_CHAT	Used for use cases related to the Generative Chat agent. It's used for Generative chat engine only, the associated data stores must enrolled with SOLUTION_TYPE_CHAT solution.
+"""
+
 
 class AgentSpaceManager:
     """Manages AgentSpace configuration and operations."""
@@ -291,18 +301,18 @@ class AgentSpaceManager:
     ) -> bool:
         """
         Create a new AgentSpace app (engine) in Discovery Engine.
-        
+
         Args:
             app_name: Name for the app (will be used to generate app_id)
             solution_type: Type of solution (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT, etc.)
             data_store_ids: List of data store IDs to associate with the app
             enable_chat: Whether to enable chat features (requires Dialogflow API)
-            
+
         Returns:
             True if successful, False otherwise
         """
         typer.echo("Creating new AgentSpace app...")
-        
+
         # Validate required environment variables
         required_vars = ["GCP_PROJECT_NUMBER", "GCP_PROJECT_ID"]
         missing = [var for var in required_vars if not self.env_vars.get(var)]
@@ -312,28 +322,28 @@ class AgentSpaceManager:
                 fg=typer.colors.RED,
             )
             return False
-        
+
         # Generate app ID with timestamp
         import time
         if not app_name:
             app_name = "agentic-soc-app"
         app_id = f"{app_name.lower().replace(' ', '-')}_{int(time.time())}"
-        
+
         project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
-        
+
         # Build the API URL
         url = (
             f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
             f"locations/global/collections/{collection}/engines"
         )
-        
+
         # Build the app configuration
         app_config = {
             "displayName": app_name,
             "solutionType": solution_type,
         }
-        
+
         # Add data stores if provided
         if data_store_ids:
             app_config["dataStoreIds"] = data_store_ids
@@ -344,7 +354,7 @@ class AgentSpaceManager:
                 fg=typer.colors.YELLOW,
             )
             return False
-        
+
         # Add chat configuration if enabled
         if enable_chat and solution_type == "SOLUTION_TYPE_CHAT":
             app_config["chatEngineConfig"] = {
@@ -354,31 +364,31 @@ class AgentSpaceManager:
                     "timeZone": self.env_vars.get("AGENT_TIMEZONE", "America/New_York"),
                 }
             }
-        
+
         # Make the API request
         typer.echo(f"  Creating app with ID: {app_id}")
         typer.echo(f"  Solution type: {solution_type}")
-        
+
         response = self._make_request(
             "POST",
             url,
             json=app_config,
             params={"engineId": app_id}
         )
-        
+
         if response and response.status_code in [200, 201]:
             typer.secho(" App created successfully!", fg=typer.colors.GREEN)
             typer.echo(f"  App ID: {app_id}")
             typer.echo(f"  Display Name: {app_name}")
-            
+
             # Update environment file with new app ID
             self._update_env_var("AGENTSPACE_APP_ID", app_id)
-            
+
             typer.echo("\n" + "=" * 80)
             typer.echo("IMPORTANT: Save this app ID to your .env file:")
             typer.echo(f"AGENTSPACE_APP_ID={app_id}")
             typer.echo("=" * 80)
-            
+
             return True
         else:
             typer.secho(" Failed to create app", fg=typer.colors.RED)
@@ -790,6 +800,74 @@ class AgentSpaceManager:
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
+    def list_apps(self) -> bool:
+        """
+        List all apps in the AgentSpace collection.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
+        if not project_number:
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
+            return False
+
+        access_token = self._get_access_token()
+        if not access_token:
+            typer.echo("Error: Failed to get access token", err=True)
+            return False
+
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Goog-User-Project": project_number,
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+
+            result = response.json()
+            engines = result.get("engines", [])
+
+            if not engines:
+                typer.echo("No apps found in AgentSpace collection.")
+                return True
+
+            typer.echo(f"\nFound {len(engines)} app(s) in AgentSpace:\n")
+            for i, engine in enumerate(engines, 1):
+                name = engine.get("name", "")
+                app_id = name.split("/")[-1] if "/" in name else name
+                display_name = engine.get("displayName", "N/A")
+                solution_type = engine.get("solutionType", "N/A")
+                data_store_ids = engine.get("dataStoreIds", [])
+                create_time = engine.get("createTime", "N/A")
+
+                typer.echo(f"{i}. App ID: {app_id}")
+                typer.echo(f"   Display Name: {display_name}")
+                typer.echo(f"   Solution Type: {solution_type}")
+
+                if data_store_ids:
+                    typer.echo(f"   Data Stores: {', '.join(data_store_ids)}")
+                else:
+                    typer.echo("   Data Stores: None")
+
+                typer.echo(f"   Create Time: {create_time}")
+                typer.echo()
+
+            return True
+
+        except requests.exceptions.RequestException as e:
+            typer.echo(f"Error listing apps: {e}", err=True)
+            if hasattr(e.response, 'text'):
+                typer.echo(f"Response: {e.response.text}", err=True)
+            return False
+
     def list_agents(self) -> bool:
         """
         List all agents in the AgentSpace app.
@@ -830,7 +908,19 @@ class AgentSpaceManager:
                 typer.echo("No agents found in AgentSpace app.")
                 return True
 
+            # Get engine details to show solution type
+            engine_url = (
+                f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+                f"locations/global/collections/default_collection/engines/{as_app}"
+            )
+            engine_response = self._make_request("GET", engine_url)
+            solution_type = "N/A"
+            if engine_response:
+                engine_data = engine_response.json()
+                solution_type = engine_data.get("solutionType", "N/A")
+
             typer.echo(f"\nFound {len(agents)} agent(s) in AgentSpace:\n")
+            typer.echo(f"Engine Solution Type: {solution_type}\n")
             for i, agent in enumerate(agents, 1):
                 name = agent.get("name", "")
                 agent_id = name.split("/")[-1] if "/" in name else name
@@ -1098,6 +1188,18 @@ def update_agent_config(
 
 
 @app.command()
+def list_apps(
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """List all apps in the AgentSpace collection."""
+    manager = AgentSpaceManager(env_file)
+    if not manager.list_apps():
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def list_agents(
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -1129,10 +1231,10 @@ def create_app(
 ) -> None:
     """Create a new AgentSpace app in Discovery Engine."""
     manager = AgentSpaceManager(env_file)
-    
+
     # Convert single data store ID to list if provided
     data_store_ids = [data_store_id] if data_store_id else None
-    
+
     if not manager.create_app(
         app_name=app_name,
         solution_type=solution_type,
