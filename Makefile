@@ -9,7 +9,7 @@
 	agent-engine-logs \
 	agentspace-register agentspace-update agentspace-verify agentspace-delete \
 	agentspace-url agentspace-test agentspace-datastore agentspace-link-agent agentspace-unlink-agent \
-	agentspace-update-agent agentspace-list-agents agentspace-create-app agentspace-redeploy \
+	agentspace-update-agent agentspace-list-agents agentspace-list-apps agentspace-create-app agentspace-redeploy \
 	datastore-create datastore-list datastore-info datastore-delete \
 	rag-list rag-info rag-create rag-delete \
 	oauth-setup oauth-create-auth oauth-verify oauth-delete \
@@ -200,6 +200,9 @@ agentspace-update-agent: ## Update agent configuration in AgentSpace
 
 agentspace-list-agents: ## List all agents in AgentSpace app
 	$(PYTHON) $(MANAGE_AGENTSPACE) list-agents --env-file $(ENV_FILE)
+
+agentspace-list-apps: ## List all apps in AgentSpace collection
+	$(PYTHON) $(MANAGE_AGENTSPACE) list-apps --env-file $(ENV_FILE)
 
 agentspace-create-app: ## Create a new AgentSpace app (use: APP_NAME="My App" TYPE=SOLUTION_TYPE_SEARCH)
 	@echo "Creating new AgentSpace app..."

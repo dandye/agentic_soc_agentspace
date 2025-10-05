@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import os
-import sys
 from pathlib import Path
 import shutil
+import sys
 
 from dotenv import load_dotenv
 from google.adk.agents import Agent
@@ -131,7 +131,6 @@ scc_tools = McpToolset(
   errlog=None
 )
 
-
 # Vertex Search MCP Tool (disabled while researching)
 #  Update: this works for search but cannot retrieve the doc *content*
 #  vertex_search_tools = McpToolset(
@@ -209,19 +208,14 @@ vertexai.init(
 
 # copy the JSON SA file to the same dir as server.py; ToDo: move to Secret Mgr
 shutil.copy(CHRONICLE_SERVICE_ACCOUNT_PATH, "./mcp-security/server/secops/secops_mcp/")
+
 # puts file into agent_engine_dependencies.tar.gz to record state of build (not used as code)
 shutil.copy("main.py", "./mcp-security/server/main.txt")
+
 # shutil.copy(SECOPS_SA_PATH, "./mcp-security/server/vertex-search/")  # disabled while researching
 
-def session_service_builder():
-  from google.adk.sessions import InMemorySessionService
-  return InMemorySessionService()
-
-# Create AdkApp instance
 app = AdkApp(
     agent=root_agent,
-    # When InMemorySessionService is NOT used in Agentspace: Exception: Cannot send a request, as the client has been closed. (so it MUST be used)
-    session_service_builder=session_service_builder,
     enable_tracing=True,
 )
 
@@ -230,11 +224,10 @@ remote_app = agent_engines.create(
   display_name="Agentic SOC Agent Engine",
   requirements=[
     "cloudpickle",
-    #"google-adk>=1.15.1",  # _claims_ to fix AttributeError: 'LlmAgent' object has no attribute 'static_instruction'. Did you mean: 'global_instruction' (but no joy)
-    "google-adk==1.14.1",  # known-woring
+    "google-adk>=1.15.1",  # fixes AttributeError: 'LlmAgent' object has no attribute 'static_instruction'. Did you mean: 'global_instruction'
     "google-genai",
     "google-cloud-discoveryengine",
-    "google-cloud-aiplatform[agent-engines]",
+    "google-cloud-aiplatform[agent-engines]==1.119.0",  # fixes VertexAiSessionService
     "pydantic",
     "python-dotenv",
   ],

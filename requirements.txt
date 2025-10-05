@@ -50,7 +50,7 @@ docstring-parser==0.17.0
     # via google-cloud-aiplatform
 fastapi==0.118.0
     # via google-adk
-google-adk==1.14.1
+google-adk==1.15.1
     # via -r requirements.in
 google-api-core[grpc]==2.25.2
     # via
@@ -62,6 +62,7 @@ google-api-core[grpc]==2.25.2
     #   google-cloud-core
     #   google-cloud-discoveryengine
     #   google-cloud-logging
+    #   google-cloud-monitoring
     #   google-cloud-resource-manager
     #   google-cloud-secret-manager
     #   google-cloud-spanner
@@ -83,6 +84,7 @@ google-auth==2.41.1
     #   google-cloud-core
     #   google-cloud-discoveryengine
     #   google-cloud-logging
+    #   google-cloud-monitoring
     #   google-cloud-resource-manager
     #   google-cloud-secret-manager
     #   google-cloud-speech
@@ -115,7 +117,11 @@ google-cloud-core==2.4.3
 google-cloud-discoveryengine==0.13.12
     # via -r requirements.in
 google-cloud-logging==3.12.1
-    # via google-cloud-aiplatform
+    # via
+    #   google-cloud-aiplatform
+    #   opentelemetry-exporter-gcp-logging
+google-cloud-monitoring==2.27.2
+    # via opentelemetry-exporter-gcp-monitoring
 google-cloud-resource-manager==1.14.2
     # via google-cloud-aiplatform
 google-cloud-secret-manager==2.24.0
@@ -139,7 +145,7 @@ google-crc32c==1.7.1
     #   google-cloud-bigtable
     #   google-cloud-storage
     #   google-resumable-media
-google-genai==1.41.0
+google-genai==1.40.0
     # via
     #   -r requirements.in
     #   google-adk
@@ -154,6 +160,7 @@ googleapis-common-protos[grpc]==1.70.0
     #   google-cloud-audit-log
     #   grpc-google-iam-v1
     #   grpcio-status
+    #   opentelemetry-exporter-otlp-proto-http
 graphviz==0.21
     # via google-adk
 grpc-google-iam-v1==0.14.2
@@ -219,21 +226,42 @@ opentelemetry-api==1.37.0
     # via
     #   google-adk
     #   google-cloud-logging
+    #   opentelemetry-exporter-gcp-monitoring
     #   opentelemetry-exporter-gcp-trace
+    #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-resourcedetector-gcp
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+opentelemetry-exporter-gcp-logging==1.9.0a0
+    # via google-adk
+opentelemetry-exporter-gcp-monitoring==1.9.0a0
+    # via google-adk
 opentelemetry-exporter-gcp-trace==1.9.0
     # via
     #   google-adk
     #   google-cloud-aiplatform
+opentelemetry-exporter-otlp-proto-common==1.37.0
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.37.0
+    # via google-adk
+opentelemetry-proto==1.37.0
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-http
 opentelemetry-resourcedetector-gcp==1.9.0a0
-    # via opentelemetry-exporter-gcp-trace
+    # via
+    #   google-adk
+    #   opentelemetry-exporter-gcp-logging
+    #   opentelemetry-exporter-gcp-monitoring
+    #   opentelemetry-exporter-gcp-trace
 opentelemetry-sdk==1.37.0
     # via
     #   google-adk
     #   google-cloud-aiplatform
+    #   opentelemetry-exporter-gcp-logging
+    #   opentelemetry-exporter-gcp-monitoring
     #   opentelemetry-exporter-gcp-trace
+    #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-resourcedetector-gcp
 opentelemetry-semantic-conventions==0.58b0
     # via opentelemetry-sdk
@@ -249,6 +277,7 @@ proto-plus==1.26.1
     #   google-cloud-bigtable
     #   google-cloud-discoveryengine
     #   google-cloud-logging
+    #   google-cloud-monitoring
     #   google-cloud-resource-manager
     #   google-cloud-secret-manager
     #   google-cloud-spanner
@@ -263,6 +292,7 @@ protobuf==6.32.1
     #   google-cloud-bigtable
     #   google-cloud-discoveryengine
     #   google-cloud-logging
+    #   google-cloud-monitoring
     #   google-cloud-resource-manager
     #   google-cloud-secret-manager
     #   google-cloud-spanner
@@ -271,6 +301,7 @@ protobuf==6.32.1
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
+    #   opentelemetry-proto
     #   proto-plus
 pyasn1==0.6.1
     # via
@@ -321,6 +352,7 @@ requests==2.32.5
     #   google-cloud-bigquery
     #   google-cloud-storage
     #   google-genai
+    #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-resourcedetector-gcp
     #   requests-oauthlib
 requests-oauthlib==2.0.0
@@ -373,6 +405,7 @@ typing-extensions==4.15.0
     #   google-genai
     #   grpcio
     #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-resourcedetector-gcp
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
