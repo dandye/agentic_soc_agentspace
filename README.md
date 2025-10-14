@@ -143,7 +143,7 @@ make agent-engine-deploy
 # Or directly: python main.py
 ```
 
-###56. Update .env with deployment outputs
+### 5. Update .env with deployment outputs
 
 1. Set `AGENT_ENGINE_RESOURCE_NAME` in .env (output from deployment)
 
