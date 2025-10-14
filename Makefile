@@ -258,12 +258,12 @@ datastore-delete: ## Delete a data store (use: DATASTORE_ID=<id> FORCE=1)
 rag-list: ## List all RAG corpora in the project (use V=1 for verbose output)
 	@$(PYTHON) $(MANAGE_RAG) list $(VERBOSE) --env-file $(ENV_FILE)
 
-rag-info: ## Get information about a specific RAG corpus (use: CORPUS_NAME=<resource_name>)
-	@if [ -z "$(CORPUS_NAME)" ]; then \
-		echo "Error: CORPUS_NAME is required. Usage: make rag-info CORPUS_NAME=<resource_name>"; \
+rag-info: ## Get information about a specific RAG corpus (use: RAG_CORPUS_NAME=<resource_name>)
+	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
+		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-info RAG_CORPUS_NAME=<resource_name>"; \
 		exit 1; \
 	fi
-	@$(PYTHON) $(MANAGE_RAG) info $(CORPUS_NAME) --env-file $(ENV_FILE)
+	@$(PYTHON) $(MANAGE_RAG) info $(RAG_CORPUS_NAME) --env-file $(ENV_FILE)
 
 rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Description")
 	@if [ -z "$(NAME)" ]; then \
@@ -275,15 +275,15 @@ rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Descriptio
 		$(if $(EMBEDDING_MODEL),--embedding-model $(EMBEDDING_MODEL)) \
 		--env-file $(ENV_FILE)
 
-rag-delete: ## Delete a RAG corpus (use: CORPUS_NAME=<resource_name> FORCE=1)
-	@if [ -z "$(CORPUS_NAME)" ]; then \
-		echo "Error: CORPUS_NAME is required. Usage: make rag-delete CORPUS_NAME=<resource_name>"; \
+rag-delete: ## Delete a RAG corpus (use: RAG_CORPUS_NAME=<resource_name> FORCE=1)
+	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
+		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-delete RAG_CORPUS_NAME=<resource_name>"; \
 		exit 1; \
 	fi
 	@if [ "$(FORCE)" = "1" ]; then \
-		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --force --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --force --env-file $(ENV_FILE); \
 	else \
-		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --env-file $(ENV_FILE); \
 	fi
 
 # OAuth management targets

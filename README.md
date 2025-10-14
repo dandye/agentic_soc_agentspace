@@ -33,6 +33,11 @@ cd agentic_soc_agentspace
 cp .env.example .env
 # Edit .env with your Google Cloud credentials
 
+# Install dependencies in a virtual env
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt  # requirements.in -> requirements.txt via pip-compile
+
 # Deploy agent
 make agent-engine-deploy
 ```
@@ -113,19 +118,13 @@ gcloud auth application-default set-quota-project $GCP_PROJECT_ID
 
 ## Installation
 
-### 1. Clone Repository
+### 1. Clone Repository (note that the submodule is checked out too)
 ```bash
 git clone --recurse-submodules https://github.com/dandye/agentic_soc_agentspace.git
 cd agentic_soc_agentspace
 ```
 
-### 2. Initialize Submodules
-```bash
-# Initialize and update git submodules (mcp-security and adk-samples)
-git submodule update --init --recursive
-```
-
-### 3. Configure Environment
+### 2. Configure Environment
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
@@ -133,22 +132,22 @@ cp .env.example .env
 #  so they are not available to you yet.
 ```
 
-### 4. Install Dependencies
+### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Deploy Agent
+### 4. Deploy Agent
 ```bash
 make agent-engine-deploy
 # Or directly: python main.py
 ```
 
-### 6. Update .env with deployment outputs
+###56. Update .env with deployment outputs
 
 1. Set `AGENT_ENGINE_RESOURCE_NAME` in .env (output from deployment)
 
-### 7. Create AgentSpace App (Optional)
+### 6. Create AgentSpace App (Optional)
 
 1. Navigate to [Google Cloud Console](https://console.cloud.google.com)
 2. Go to **Vertex AI > Search & Conversation > Apps**
@@ -157,7 +156,7 @@ make agent-engine-deploy
 5. Configure with your preferred settings
 6. Copy the App ID and add to `.env` as `AGENTSPACE_APP_ID`
 
-### 8. Register Agent with AgentSpace
+### 7. Register Agent with AgentSpace
 
 ```bash
 make agentspace-register
@@ -239,10 +238,10 @@ make rag-list VERBOSE=1
 make rag-create NAME="Security Runbooks"
 
 # Get corpus information
-make rag-info CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
+make rag-info RAG_CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
 
 # Delete a corpus
-make rag-delete CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
+make rag-delete RAG_CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
 ```
 
 **Note:** After creating a RAG corpus, save the resource name to your `.env` as `RAG_CORPUS_NAME`.
@@ -378,7 +377,7 @@ make agentspace-test  # Test components
 Yes. All security tool integrations are optional.
 
 **What AI models are supported?**
-Gemini 2.0 Flash (default). Configure others in `main.py`.
+The default is gemini-2.5-flash but you can use any model suppored by Vertex AI Model Garden and ADK. Configure in `main.py`.
 
 **How do I update the agent?**
 ```bash
