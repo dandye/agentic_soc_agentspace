@@ -50,7 +50,8 @@ class RAGManager:
     def _initialize_vertex_ai(self) -> None:
         """Initialize Vertex AI with project and location from environment."""
         self.project_id = self.env_vars.get("GCP_PROJECT_ID")
-        self.location = self.env_vars.get("GCP_LOCATION")
+        # Use RAG-specific location if set, otherwise fall back to GCP_LOCATION
+        self.location = self.env_vars.get("RAG_GCP_LOCATION") or self.env_vars.get("GCP_LOCATION")
 
         if not self.project_id:
             typer.secho(
@@ -86,44 +87,70 @@ class RAGManager:
             True if successful, False otherwise
         """
         try:
-            corpora = list(rag.list_corpora())
+            # Use pagination to handle large numbers of corpora
+            # This also helps with quota limits by making smaller requests
+            # Display results as we fetch each page (streaming)
+            total_count = 0
+            page_num = 0
+            page_token = None
+            page_size = 10
 
-            if not corpora:
+            typer.echo()  # Blank line before output
+
+            while True:
+                page_num += 1
+                typer.echo(f"Fetching page {page_num}...")
+
+                # Get the next page of results
+                pager = rag.list_corpora(page_size=page_size, page_token=page_token)
+
+                # Process and display each corpus immediately
+                page_count = 0
+                for corpus in pager:
+                    total_count += 1
+                    page_count += 1
+
+                    display_name = corpus.display_name
+                    corpus_name = corpus.name
+                    description = getattr(corpus, "description", "N/A")
+
+                    typer.echo(f"{total_count}. {display_name}")
+                    typer.echo(f"   Name: {corpus_name}")
+                    if description and description != "N/A":
+                        typer.echo(f"   Description: {description}")
+
+                    if verbose:
+                        # Show embedding model configuration
+                        if hasattr(corpus, "embedding_model_config"):
+                            config = corpus.embedding_model_config
+                            if hasattr(config, "publisher_model"):
+                                typer.echo(f"   Embedding Model: {config.publisher_model}")
+
+                        # Try to list files in the corpus
+                        try:
+                            files = list(rag.list_files(corpus_name=corpus_name))
+                            typer.echo(f"   Files: {len(files)}")
+                            if files:
+                                for file in files[:3]:  # Show first 3 files
+                                    typer.echo(f"     - {file.display_name}")
+                                if len(files) > 3:
+                                    typer.echo(f"     ... and {len(files) - 3} more")
+                        except Exception as e:
+                            typer.echo(f"   Files: Unable to retrieve ({str(e)[:50]})")
+
+                    typer.echo()
+
+                typer.echo(f"  (found {page_count} on this page)\n")
+
+                # Check for next page AFTER iterating through current page
+                page_token = getattr(pager, 'next_page_token', None)
+                if not page_token:
+                    break
+
+            if total_count == 0:
                 typer.echo("No RAG corpora found.")
-                return True
-
-            typer.echo(f"Found {len(corpora)} RAG corpus/corpora:\n")
-
-            for i, corpus in enumerate(corpora, 1):
-                display_name = corpus.display_name
-                corpus_name = corpus.name
-                description = getattr(corpus, "description", "N/A")
-
-                typer.echo(f"{i}. {display_name}")
-                typer.echo(f"   Name: {corpus_name}")
-                if description and description != "N/A":
-                    typer.echo(f"   Description: {description}")
-
-                if verbose:
-                    # Show embedding model configuration
-                    if hasattr(corpus, "embedding_model_config"):
-                        config = corpus.embedding_model_config
-                        if hasattr(config, "publisher_model"):
-                            typer.echo(f"   Embedding Model: {config.publisher_model}")
-
-                    # Try to list files in the corpus
-                    try:
-                        files = list(rag.list_files(corpus_name=corpus_name))
-                        typer.echo(f"   Files: {len(files)}")
-                        if files:
-                            for file in files[:3]:  # Show first 3 files
-                                typer.echo(f"     - {file.display_name}")
-                            if len(files) > 3:
-                                typer.echo(f"     ... and {len(files) - 3} more")
-                    except Exception as e:
-                        typer.echo(f"   Files: Unable to retrieve ({str(e)[:50]})")
-
-                typer.echo()
+            else:
+                typer.echo(f"Total: {total_count} RAG corpus/corpora")
 
             return True
 
@@ -279,12 +306,12 @@ class RAGManager:
             display_name = corpus.display_name
 
             if not force:
-                typer.echo(f"\nCorpus to delete:")
+                typer.echo("\nCorpus to delete:")
                 typer.echo(f"  Display Name: {display_name}")
                 typer.echo(f"  Resource Name: {corpus_name}")
 
                 if not typer.confirm(
-                    f"\nAre you sure you want to delete this corpus?"
+                    "\nAre you sure you want to delete this corpus?"
                 ):
                     typer.echo("Cancelled.")
                     return False
