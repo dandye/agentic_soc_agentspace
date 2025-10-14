@@ -43,7 +43,7 @@ For detailed deployment instructions, see the [Deployment Workflow](#deployment-
 
 The Makefile provides a comprehensive set of commands for managing your deployment:
 
-![Makefile Help Output](https://private-user-images.githubusercontent.com/121151/491785880-3f34bbdf-fcaa-4343-b803-9f460ba194a0.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTgzMTM5NTgsIm5iZiI6MTc1ODMxMzY1OCwicGF0aCI6Ii8xMjExNTEvNDkxNzg1ODgwLTNmMzRiYmRmLWZjYWEtNDM0My1iODAzLTlmNDYwYmExOTRhMC5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUwOTE5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MDkxOVQyMDI3MzhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00ZTM5YTgwYWFmOTg1MWViMDMxMTdhNDVkZmE1NGM3NDcwNjgwZjM4OWM3MjUyZTE2MTIyYjA1ZDNlODI4YTNhJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.s5J7oD0CQ9MFAXvNTBYvEwR5jfq-hFQRas0igrWMGi0)
+![Makefile Help Output](https://github.com/user-attachments/assets/a11f6f3f-f03e-4380-ab45-5e2ed19dfcfe)
 
 Run `make help` to see this interactive command reference.
 
@@ -268,7 +268,7 @@ make datastore-create NAME="Security Data" TYPE=SOLUTION_TYPE_SEARCH
    - Click **Create App** and select **Agent** type
    - Configure with your preferred settings
    - Note: The agent uses RAG for document retrieval, not Discovery Engine data stores
-   
+
 2. **Copy App ID** to `.env` as `AGENTSPACE_APP_ID`
 3. **Register agent**: `make agentspace-link-agent` (add OAuth with `make oauth-setup` first if needed)
 4. **Verify**: `make agentspace-verify`

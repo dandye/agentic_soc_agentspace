@@ -28,7 +28,7 @@ else
 	Q := @
 endif
 
-# Parallel jobs control  
+# Parallel jobs control
 MAKEFLAGS += --no-print-directory
 
 # Load environment variables if .env exists
@@ -71,25 +71,25 @@ help: ## Show this help message
 	@echo "\033[1;34m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
 	@echo ""
 	@echo "\033[1;32mSetup & Development\033[0m"
-	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;31mAgent Engine Management\033[0m"
-	@grep -h -E '^agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-32s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;35mAgentSpace Management\033[0m"
-	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;33mData Store Management\033[0m"
-	@grep -h -E '^datastore-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^datastore-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;32mRAG Corpus Management\033[0m"
-	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;34mOAuth Management\033[0m"
-	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;36mWorkflows & Utilities\033[0m"
-	@grep -h -E '^(status|cleanup|.*-redeploy|redeploy-all|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^(status|cleanup|.*-redeploy|redeploy-all|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;37mUsage Examples:\033[0m"
 	@echo "  \033[33mmake setup\033[0m                              - Initialize project and install dependencies"
