@@ -105,9 +105,10 @@ Your account needs these roles:
 
 ### Authentication Setup
 ```bash
+GCP_PROJECT_ID=your-project-id
 gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID
-gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+gcloud config set project $GCP_PROJECT_ID
+gcloud auth application-default set-quota-project $GCP_PROJECT_ID
 ```
 
 ## Installation
@@ -147,8 +148,6 @@ make agent-engine-deploy
 
 1. Set `AGENT_ENGINE_RESOURCE_NAME` in .env (output from deployment)
 
-
-
 ### 7. Create AgentSpace App (Optional)
 
 1. Navigate to [Google Cloud Console](https://console.cloud.google.com)
@@ -163,7 +162,6 @@ make agent-engine-deploy
 ```bash
 make agentspace-register
 ```
-
 
 ## Deployment Workflow
 
@@ -359,7 +357,7 @@ python -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.ge
 |-------|----------|
 | **403/401 Auth Error** | `gcloud auth application-default login` |
 | **API not enabled** | `gcloud services enable aiplatform.googleapis.com` |
-| **Bucket not found** | `gsutil mb -p $PROJECT_ID gs://$STAGING_BUCKET` |
+| **Bucket not found** | `gsutil mb -p $GCP_PROJECT_ID $GCP_STAGING_BUCKET` |
 | **MCP module missing** | `git submodule update --init --recursive` |
 | **KeyError: GCP_PROJECT_ID** | Check `.env` exists with correct variable names (v2.0+) |
 | **Agent not in AgentSpace** | `make agentspace-verify` then `make agentspace-link-agent` |
