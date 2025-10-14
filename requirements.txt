@@ -50,7 +50,7 @@ docstring-parser==0.17.0
     # via google-cloud-aiplatform
 fastapi==0.118.0
     # via google-adk
-google-adk==1.15.1
+google-adk==1.16.0
     # via -r requirements.in
 google-api-core[grpc]==2.25.2
     # via
@@ -95,7 +95,7 @@ google-auth-httplib2==0.2.0
     # via google-api-python-client
 google-auth-oauthlib==1.2.2
     # via -r requirements.in
-google-cloud-aiplatform[agent-engines]==1.119.0
+google-cloud-aiplatform[agent-engines]==1.120.0
     # via
     #   -r requirements.in
     #   google-adk
@@ -115,7 +115,9 @@ google-cloud-core==2.4.3
     #   google-cloud-spanner
     #   google-cloud-storage
 google-cloud-discoveryengine==0.13.12
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   google-adk
 google-cloud-logging==3.12.1
     # via
     #   google-cloud-aiplatform
@@ -145,7 +147,7 @@ google-crc32c==1.7.1
     #   google-cloud-bigtable
     #   google-cloud-storage
     #   google-resumable-media
-google-genai==1.40.0
+google-genai==1.43.0
     # via
     #   -r requirements.in
     #   google-adk
