@@ -161,9 +161,9 @@ class OAuthManager:
         Returns:
             True if successful, False otherwise
         """
-        project_number = self.env_vars.get("PROJECT_NUMBER")
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
         if not project_number:
-            typer.echo("Error: PROJECT_NUMBER not found in environment", err=True)
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
             return False
         
         access_token = self._get_access_token()
@@ -222,9 +222,9 @@ class OAuthManager:
         Returns:
             True if successful, False otherwise
         """
-        project_number = self.env_vars.get("PROJECT_NUMBER")
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
         if not project_number:
-            typer.echo("Error: PROJECT_NUMBER not found in environment", err=True)
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
             return False
         
         access_token = self._get_access_token()
@@ -262,9 +262,9 @@ class OAuthManager:
         Returns:
             Authorization details if found, None otherwise
         """
-        project_number = self.env_vars.get("PROJECT_NUMBER")
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
         if not project_number:
-            typer.echo("Error: PROJECT_NUMBER not found in environment", err=True)
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
             return None
         
         access_token = self._get_access_token()

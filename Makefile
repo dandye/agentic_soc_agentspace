@@ -6,9 +6,12 @@
 .PHONY: help install setup clean check-prereqs check-deploy check-integration \
 	agent-engine-deploy agent-engine-deploy-and-delete agent-engine-test \
 	agent-engine-list agent-engine-delete-by-index agent-engine-delete-by-resource agent-engine-redeploy \
+	agent-engine-logs \
 	agentspace-register agentspace-update agentspace-verify agentspace-delete \
-	agentspace-url agentspace-test agentspace-datastore agentspace-link-agent \
-	agentspace-update-agent agentspace-list-agents agentspace-redeploy \
+	agentspace-url agentspace-test agentspace-datastore agentspace-link-agent agentspace-unlink-agent \
+	agentspace-update-agent agentspace-list-agents agentspace-list-apps agentspace-create-app agentspace-redeploy \
+	datastore-create datastore-list datastore-info datastore-delete \
+	rag-list rag-info rag-create rag-delete \
 	oauth-setup oauth-create-auth oauth-verify oauth-delete \
 	redeploy-all oauth-workflow full-deploy-with-oauth status cleanup check-env lint format
 
@@ -41,20 +44,19 @@ PYTHON := $(shell if [ -d "venv" ]; then echo "venv/bin/python"; else echo "pyth
 MANAGE_AGENTSPACE := installation_scripts/manage_agentspace.py
 MANAGE_AGENT_ENGINE := installation_scripts/manage_agent_engine.py
 MANAGE_OAUTH := installation_scripts/manage_oauth.py
+MANAGE_DATASTORE := installation_scripts/manage_datastore.py
+MANAGE_RAG := installation_scripts/manage_rag.py
 
 # Validation targets
 .PHONY: check-prereqs check-deploy check-integration
 
 check-prereqs: ## Validate Stage 1 prerequisites
-	$(Q)if [ -z "$(PROJECT_ID)" ]; then echo "ERROR: PROJECT_ID not set in $(ENV_FILE)"; exit 1; fi
-	$(Q)if [ -z "$(PROJECT_NUMBER)" ]; then echo "ERROR: PROJECT_NUMBER not set in $(ENV_FILE)"; exit 1; fi
-	$(Q)if [ -z "$(LOCATION)" ]; then echo "ERROR: LOCATION not set in $(ENV_FILE)"; exit 1; fi
-	$(Q)if [ -z "$(STAGING_BUCKET)" ]; then echo "ERROR: STAGING_BUCKET not set in $(ENV_FILE)"; exit 1; fi
-	$(Q)if [ -z "$(GOOGLE_API_KEY)" ]; then echo "ERROR: GOOGLE_API_KEY not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(GCP_PROJECT_ID)" ]; then echo "ERROR: GCP_PROJECT_ID not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(GCP_LOCATION)" ]; then echo "ERROR: GCP_LOCATION not set in $(ENV_FILE)"; exit 1; fi
+	$(Q)if [ -z "$(GCP_STAGING_BUCKET)" ]; then echo "ERROR: GCP_STAGING_BUCKET not set in $(ENV_FILE)"; exit 1; fi
 	$(Q)echo "Stage 1 prerequisites validated"
 
 check-deploy: ## Validate Stage 2 deployment outputs
-	@if [ -z "$(REASONING_ENGINE)" ]; then echo "ERROR: REASONING_ENGINE not set - run 'make agent-engine-deploy' first"; exit 1; fi
 	@if [ -z "$(AGENT_ENGINE_RESOURCE_NAME)" ]; then echo "ERROR: AGENT_ENGINE_RESOURCE_NAME not set - run 'make agent-engine-deploy' first"; exit 1; fi
 	@echo "Stage 2 deployment outputs validated"
 
@@ -76,6 +78,12 @@ help: ## Show this help message
 	@echo ""
 	@echo "\033[1;35mAgentSpace Management\033[0m"
 	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33mData Store Management\033[0m"
+	@grep -h -E '^datastore-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;32mRAG Corpus Management\033[0m"
+	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;34mOAuth Management\033[0m"
 	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -121,7 +129,7 @@ agent-engine-deploy: check-prereqs ## Deploy the main agent engine
 	$(Q)echo "DEPLOYMENT COMPLETE - Save these values to .env:"
 	$(Q)echo "========================================"
 	$(Q)echo "Check the output above for:"
-	$(Q)echo "  REASONING_ENGINE=<numeric_id>"
+	$(Q)echo "  AGENT_ENGINE_ID=<numeric_id>"
 	$(Q)echo "  AGENT_ENGINE_RESOURCE_NAME=<full_resource_path>"
 	$(Q)echo "========================================"
 
@@ -180,11 +188,103 @@ agentspace-link-agent: check-integration ## Link deployed agent to AgentSpace wi
 	@echo "  AGENTSPACE_AGENT_ID=<numeric_id>"
 	@echo "========================================"
 
+agentspace-unlink-agent: ## Unlink agent from AgentSpace (use AGENT_ID=<id> for specific agent, FORCE=1 to skip confirmation)
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_AGENTSPACE) unlink-agent --force $(if $(AGENT_ID),--agent-id $(AGENT_ID)) --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_AGENTSPACE) unlink-agent $(if $(AGENT_ID),--agent-id $(AGENT_ID)) --env-file $(ENV_FILE); \
+	fi
+
 agentspace-update-agent: ## Update agent configuration in AgentSpace
 	$(PYTHON) $(MANAGE_AGENTSPACE) update-agent-config --env-file $(ENV_FILE)
 
 agentspace-list-agents: ## List all agents in AgentSpace app
 	$(PYTHON) $(MANAGE_AGENTSPACE) list-agents --env-file $(ENV_FILE)
+
+agentspace-list-apps: ## List all apps in AgentSpace collection
+	$(PYTHON) $(MANAGE_AGENTSPACE) list-apps --env-file $(ENV_FILE)
+
+agentspace-create-app: ## Create a new AgentSpace app (use: APP_NAME="My App" TYPE=SOLUTION_TYPE_SEARCH)
+	@echo "Creating new AgentSpace app..."
+	@echo "Options:"
+	@echo "  APP_NAME='<name>' - App display name (default: agentic-soc-app)"
+	@echo "  TYPE=<type> - Solution type (default: SOLUTION_TYPE_SEARCH)"
+	@echo "  DATA_STORE=<id> - Data store ID to associate"
+	@echo "  ENABLE_CHAT=1 - Enable chat features (for SOLUTION_TYPE_CHAT)"
+	@$(PYTHON) $(MANAGE_AGENTSPACE) create-app \
+		$(if $(APP_NAME),--name "$(APP_NAME)") \
+		$(if $(TYPE),--type $(TYPE)) \
+		$(if $(DATA_STORE),--data-store $(DATA_STORE)) \
+		$(if $(filter 1,$(ENABLE_CHAT)),--enable-chat) \
+		--env-file $(ENV_FILE)
+
+# Data Store management targets
+datastore-create: ## Create a new data store (use: NAME="My Store" TYPE=SOLUTION_TYPE_SEARCH)
+	@echo "Creating new data store..."
+	@echo "Options:"
+	@echo "  NAME='<name>' - Data store display name (default: datastore)"
+	@echo "  TYPE=<type> - Solution type (default: SOLUTION_TYPE_SEARCH)"
+	@echo "  CONTENT=<config> - Content config (default: CONTENT_REQUIRED)"
+	@echo "  INDUSTRY=<vertical> - Industry vertical (default: GENERIC)"
+	@$(PYTHON) $(MANAGE_DATASTORE) create \
+		$(if $(NAME),--name "$(NAME)") \
+		$(if $(TYPE),--type $(TYPE)) \
+		$(if $(CONTENT),--content $(CONTENT)) \
+		$(if $(INDUSTRY),--industry $(INDUSTRY)) \
+		--env-file $(ENV_FILE)
+
+datastore-list: ## List all data stores in the project
+	@$(PYTHON) $(MANAGE_DATASTORE) list --env-file $(ENV_FILE)
+
+datastore-info: ## Get information about a specific data store (use: DATASTORE_ID=<id>)
+	@if [ -z "$(DATASTORE_ID)" ]; then \
+		echo "Error: DATASTORE_ID is required. Usage: make datastore-info DATASTORE_ID=<id>"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_DATASTORE) info $(DATASTORE_ID) --env-file $(ENV_FILE)
+
+datastore-delete: ## Delete a data store (use: DATASTORE_ID=<id> FORCE=1)
+	@if [ -z "$(DATASTORE_ID)" ]; then \
+		echo "Error: DATASTORE_ID is required. Usage: make datastore-delete DATASTORE_ID=<id>"; \
+		exit 1; \
+	fi
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_DATASTORE) delete $(DATASTORE_ID) --force --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_DATASTORE) delete $(DATASTORE_ID) --env-file $(ENV_FILE); \
+	fi
+
+# RAG Corpus management targets
+rag-list: ## List all RAG corpora in the project (use V=1 for verbose output)
+	@$(PYTHON) $(MANAGE_RAG) list $(VERBOSE) --env-file $(ENV_FILE)
+
+rag-info: ## Get information about a specific RAG corpus (use: CORPUS_NAME=<resource_name>)
+	@if [ -z "$(CORPUS_NAME)" ]; then \
+		echo "Error: CORPUS_NAME is required. Usage: make rag-info CORPUS_NAME=<resource_name>"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_RAG) info $(CORPUS_NAME) --env-file $(ENV_FILE)
+
+rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Description")
+	@if [ -z "$(NAME)" ]; then \
+		echo "Error: NAME is required. Usage: make rag-create NAME='My Corpus' DESC='Optional description'"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_RAG) create "$(NAME)" \
+		$(if $(DESC),--description "$(DESC)") \
+		$(if $(EMBEDDING_MODEL),--embedding-model $(EMBEDDING_MODEL)) \
+		--env-file $(ENV_FILE)
+
+rag-delete: ## Delete a RAG corpus (use: CORPUS_NAME=<resource_name> FORCE=1)
+	@if [ -z "$(CORPUS_NAME)" ]; then \
+		echo "Error: CORPUS_NAME is required. Usage: make rag-delete CORPUS_NAME=<resource_name>"; \
+		exit 1; \
+	fi
+	@if [ "$(FORCE)" = "1" ]; then \
+		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --force --env-file $(ENV_FILE); \
+	else \
+		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --env-file $(ENV_FILE); \
+	fi
 
 # OAuth management targets
 oauth-setup: ## Interactive OAuth client setup from client_secret.json (use: make oauth-setup CLIENT_SECRET=path/to/client_secret.json)
@@ -242,6 +342,17 @@ agent-engine-delete-by-resource: ## Delete Agent Engine instance by resource nam
 # Workflow targets
 agent-engine-redeploy: agent-engine-deploy ## Redeploy the agent engine
 	@echo "Agent engine redeployment completed successfully!"
+
+agent-engine-logs: ## Get logs for a specific agent engine (requires: AGENT_ENGINE_RESOURCE_NAME in .env)
+ifndef AGENT_ENGINE_RESOURCE_NAME
+	$(error AGENT_ENGINE_RESOURCE_NAME is required. Set it in your .env file or run agent-engine-deploy first)
+endif
+	$(eval ENGINE_ID := $(shell echo $(AGENT_ENGINE_RESOURCE_NAME) | rev | cut -d'/' -f1 | rev))
+	gcloud logging read 'resource.labels.reasoning_engine_id="$(ENGINE_ID)"' \
+		--project=$(GCP_PROJECT_ID) \
+		--format="table(timestamp,severity,textPayload)" \
+		--freshness=10m \
+		--order=desc
 
 agentspace-redeploy: agentspace-update ## Update AgentSpace configuration
 	@echo "AgentSpace configuration update completed successfully!"

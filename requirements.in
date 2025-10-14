@@ -1,0 +1,9 @@
+cloudpickle
+google-adk==1.16.0
+google-genai
+google-cloud-discoveryengine
+google-cloud-aiplatform[agent_engines]==1.120.0
+pydantic
+python-dotenv
+google-auth-oauthlib
+typer
