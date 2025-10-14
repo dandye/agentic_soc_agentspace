@@ -28,7 +28,7 @@ else
 	Q := @
 endif
 
-# Parallel jobs control  
+# Parallel jobs control
 MAKEFLAGS += --no-print-directory
 
 # Load environment variables if .env exists
@@ -71,25 +71,25 @@ help: ## Show this help message
 	@echo "\033[1;34m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
 	@echo ""
 	@echo "\033[1;32mSetup & Development\033[0m"
-	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^(setup|install|clean|lint|format):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;31mAgent Engine Management\033[0m"
-	@grep -h -E '^agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^agent-engine-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-32s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;35mAgentSpace Management\033[0m"
-	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^agentspace-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;33mData Store Management\033[0m"
-	@grep -h -E '^datastore-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^datastore-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;32mRAG Corpus Management\033[0m"
-	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;34mOAuth Management\033[0m"
-	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;36mWorkflows & Utilities\033[0m"
-	@grep -h -E '^(status|cleanup|.*-redeploy|redeploy-all|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -h -E '^(status|cleanup|.*-redeploy|redeploy-all|full-deploy-with-oauth):.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;37mUsage Examples:\033[0m"
 	@echo "  \033[33mmake setup\033[0m                              - Initialize project and install dependencies"
@@ -258,12 +258,12 @@ datastore-delete: ## Delete a data store (use: DATASTORE_ID=<id> FORCE=1)
 rag-list: ## List all RAG corpora in the project (use V=1 for verbose output)
 	@$(PYTHON) $(MANAGE_RAG) list $(VERBOSE) --env-file $(ENV_FILE)
 
-rag-info: ## Get information about a specific RAG corpus (use: CORPUS_NAME=<resource_name>)
-	@if [ -z "$(CORPUS_NAME)" ]; then \
-		echo "Error: CORPUS_NAME is required. Usage: make rag-info CORPUS_NAME=<resource_name>"; \
+rag-info: ## Get information about a specific RAG corpus (use: RAG_CORPUS_NAME=<resource_name>)
+	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
+		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-info RAG_CORPUS_NAME=<resource_name>"; \
 		exit 1; \
 	fi
-	@$(PYTHON) $(MANAGE_RAG) info $(CORPUS_NAME) --env-file $(ENV_FILE)
+	@$(PYTHON) $(MANAGE_RAG) info $(RAG_CORPUS_NAME) --env-file $(ENV_FILE)
 
 rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Description")
 	@if [ -z "$(NAME)" ]; then \
@@ -275,15 +275,15 @@ rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Descriptio
 		$(if $(EMBEDDING_MODEL),--embedding-model $(EMBEDDING_MODEL)) \
 		--env-file $(ENV_FILE)
 
-rag-delete: ## Delete a RAG corpus (use: CORPUS_NAME=<resource_name> FORCE=1)
-	@if [ -z "$(CORPUS_NAME)" ]; then \
-		echo "Error: CORPUS_NAME is required. Usage: make rag-delete CORPUS_NAME=<resource_name>"; \
+rag-delete: ## Delete a RAG corpus (use: RAG_CORPUS_NAME=<resource_name> FORCE=1)
+	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
+		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-delete RAG_CORPUS_NAME=<resource_name>"; \
 		exit 1; \
 	fi
 	@if [ "$(FORCE)" = "1" ]; then \
-		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --force --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --force --env-file $(ENV_FILE); \
 	else \
-		$(PYTHON) $(MANAGE_RAG) delete $(CORPUS_NAME) --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --env-file $(ENV_FILE); \
 	fi
 
 # OAuth management targets
