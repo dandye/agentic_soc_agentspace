@@ -297,7 +297,7 @@ Run `make help` to see all available commands with descriptions (shown in image 
 │   ├── manage_agentspace.py   # Agentspace configuration
 │   └── manage_oauth.py        # OAuth setup utilities
 └── mcp-security/              # MCP security servers (submodule)
-    └── servers/
+    └── server/
         ├── mcp-server-soar/
         ├── mcp-server-secops/
         ├── mcp-server-gti/
@@ -331,7 +331,7 @@ tools = [secops_tool, soar_tool]  # Choose tools as needed
 
 ```bash
 # Test MCP servers locally
-cd mcp-security/servers/secops-soar/secops_soar_mcp
+cd mcp-security/server/secops-soar/secops_soar_mcp
 uv run server.py
 ```
 Success looks like:
