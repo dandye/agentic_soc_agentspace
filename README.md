@@ -26,7 +26,7 @@ Deploy security-focused AI agents to Google Cloud with integrated access to Chro
 
 ```bash
 # Clone and setup
-git clone --recurse-submodules https://github.com/your-org/agentic_soc_agentspace.git
+git clone --recurse-submodules https://github.com/dandye/agentic_soc_agentspace.git
 cd agentic_soc_agentspace
 
 # Configure environment
