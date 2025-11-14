@@ -4,8 +4,6 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-absolufy-imports==0.3.1
-    # via google-adk
 alembic==1.16.5
     # via sqlalchemy-spanner
 annotated-types==0.7.0
@@ -50,7 +48,7 @@ docstring-parser==0.17.0
     # via google-cloud-aiplatform
 fastapi==0.118.0
     # via google-adk
-google-adk==1.17.0
+google-adk==1.18.0
     # via -r requirements.in
 google-api-core[grpc]==2.25.2
     # via
@@ -95,7 +93,7 @@ google-auth-httplib2==0.2.0
     # via google-api-python-client
 google-auth-oauthlib==1.2.2
     # via -r requirements.in
-google-cloud-aiplatform[agent-engines]==1.122.0
+google-cloud-aiplatform[agent-engines]==1.126.1
     # via
     #   -r requirements.in
     #   google-adk
@@ -115,9 +113,7 @@ google-cloud-core==2.4.3
     #   google-cloud-spanner
     #   google-cloud-storage
 google-cloud-discoveryengine==0.13.12
-    # via
-    #   -r requirements.in
-    #   google-adk
+    # via google-adk
 google-cloud-logging==3.12.1
     # via
     #   google-cloud-aiplatform
@@ -134,7 +130,7 @@ google-cloud-spanner==3.58.0
     #   sqlalchemy-spanner
 google-cloud-speech==2.33.0
     # via google-adk
-google-cloud-storage==2.19.0
+google-cloud-storage==3.4.1
     # via
     #   google-adk
     #   google-cloud-aiplatform
@@ -147,9 +143,8 @@ google-crc32c==1.7.1
     #   google-cloud-bigtable
     #   google-cloud-storage
     #   google-resumable-media
-google-genai==1.43.0
+google-genai==1.50.1
     # via
-    #   -r requirements.in
     #   google-adk
     #   google-cloud-aiplatform
 google-resumable-media==2.7.2
@@ -235,7 +230,9 @@ opentelemetry-api==1.37.0
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
 opentelemetry-exporter-gcp-logging==1.9.0a0
-    # via google-adk
+    # via
+    #   google-adk
+    #   google-cloud-aiplatform
 opentelemetry-exporter-gcp-monitoring==1.9.0a0
     # via google-adk
 opentelemetry-exporter-gcp-trace==1.9.0
@@ -245,7 +242,9 @@ opentelemetry-exporter-gcp-trace==1.9.0
 opentelemetry-exporter-otlp-proto-common==1.37.0
     # via opentelemetry-exporter-otlp-proto-http
 opentelemetry-exporter-otlp-proto-http==1.37.0
-    # via google-adk
+    # via
+    #   google-adk
+    #   google-cloud-aiplatform
 opentelemetry-proto==1.37.0
     # via
     #   opentelemetry-exporter-otlp-proto-common
@@ -391,7 +390,7 @@ starlette==0.48.0
     #   fastapi
     #   google-adk
     #   mcp
-tenacity==8.5.0
+tenacity==9.1.2
     # via
     #   google-adk
     #   google-genai
