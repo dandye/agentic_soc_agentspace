@@ -371,7 +371,6 @@ class AgentEngineManager:
                 extra_packages=[
                     "mcp-security/server",
                     "installation_scripts/install.sh",  # installs uvx
-                    "soc_agent",  # is this needed?
                 ],
                 env_vars=env_vars,
             )
