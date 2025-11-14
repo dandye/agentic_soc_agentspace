@@ -14,6 +14,7 @@ Deploy security-focused AI agents to Google Cloud with integrated access to Chro
 - [Usage](#usage)
 - [AgentSpace Integration](#agentspace-integration)
 - [Makefile Reference](#makefile-reference)
+- [Python CLI (Alternative Interface)](#python-cli-alternative-interface)
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
@@ -180,7 +181,7 @@ Set these variables in your `.env` file before deployment:
 - Chronicle SIEM: `CHRONICLE_CUSTOMER_ID`, `CHRONICLE_REGION`, `CHRONICLE_SERVICE_ACCOUNT_PATH`
 - SOAR: `SOAR_URL`, `SOAR_API_KEY`
 - Threat Intelligence: `GTI_API_KEY` (Google Threat Intelligence/VirusTotal)
-- RAG Corpus: `RAG_CORPUS_NAME` (full resource name)
+- RAG Corpus: `RAG_CORPUS_ID` (full resource name)
 
 ### Stage 2: Deployment Outputs
 Run `make agent-engine-deploy` and save the generated `AGENT_ENGINE_RESOURCE_NAME` from the output to your `.env`.
@@ -238,13 +239,13 @@ make rag-list VERBOSE=1
 make rag-create NAME="Security Runbooks"
 
 # Get corpus information
-make rag-info RAG_CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
+make rag-info RAG_CORPUS_ID=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
 
 # Delete a corpus
-make rag-delete RAG_CORPUS_NAME=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
+make rag-delete RAG_CORPUS_ID=projects/PROJECT/locations/LOCATION/ragCorpora/CORPUS_ID
 ```
 
-**Note:** After creating a RAG corpus, save the resource name to your `.env` as `RAG_CORPUS_NAME`.
+**Note:** After creating a RAG corpus, save the resource name to your `.env` as `RAG_CORPUS_ID`.
 
 ## Data Store Management (Optional - Legacy)
 
@@ -280,6 +281,138 @@ Run `make help` to see all available commands with descriptions (shown in image 
 - `INDEX=n` - Specify item index
 
 **Example:** `FORCE=1 make agentspace-register`
+
+## Python CLI (Alternative Interface)
+
+In addition to the Makefile, this project provides a unified Python CLI built with Typer that offers the same functionality with additional benefits like type safety, autocomplete, and programmatic access.
+
+### Quick Start
+
+```bash
+# Show all available commands
+python manage.py --help
+
+# Check system status
+python manage.py workflow status
+
+# List agent engines
+python manage.py agent-engine list
+
+# Register with AgentSpace
+python manage.py agentspace register
+```
+
+### CLI Structure
+
+The CLI is organized into subcommand groups:
+
+```
+python manage.py
+├── agent-engine    # Manage Agent Engine instances
+├── agentspace      # Manage AgentSpace apps and agents
+├── oauth           # Manage OAuth authorizations
+├── datastore       # Manage data stores
+├── rag             # Manage RAG corpora
+├── workflow        # Composite workflows
+├── setup           # Environment setup
+└── version         # Version information
+```
+
+### Common Commands
+
+**Agent Engine Management:**
+```bash
+python manage.py agent-engine list
+python manage.py agent-engine delete --index 1
+python manage.py agent-engine delete --resource "projects/.../reasoningEngines/..." --force
+```
+
+**AgentSpace Management:**
+```bash
+python manage.py agentspace register
+python manage.py agentspace update
+python manage.py agentspace verify
+python manage.py agentspace link-agent
+python manage.py agentspace list-agents
+```
+
+**RAG Corpus Management:**
+```bash
+python manage.py rag list --verbose
+python manage.py rag create "Security Runbooks" --description "SOC procedures"
+python manage.py rag info "projects/.../ragCorpora/..."
+python manage.py rag delete "projects/.../ragCorpora/..." --force
+```
+
+**OAuth Management:**
+```bash
+python manage.py oauth setup client_secret.json
+python manage.py oauth create-auth
+python manage.py oauth verify
+```
+
+**Workflow Commands:**
+```bash
+# Complete deployment with OAuth
+python manage.py workflow full-deploy
+
+# Redeploy everything
+python manage.py workflow redeploy-all
+
+# Check system status
+python manage.py workflow status
+```
+
+### Command Mapping: Makefile to Python CLI
+
+| Makefile Command | Python CLI Equivalent |
+|-----------------|----------------------|
+| `make agent-engine-list` | `python manage.py agent-engine list` |
+| `make agent-engine-delete-by-index INDEX=1` | `python manage.py agent-engine delete --index 1` |
+| `make agentspace-register` | `python manage.py agentspace register` |
+| `make agentspace-register FORCE=1` | `python manage.py agentspace register --force` |
+| `make oauth-setup CLIENT_SECRET=x.json` | `python manage.py oauth setup x.json` |
+| `make rag-list` | `python manage.py rag list` |
+| `make rag-create NAME="x"` | `python manage.py rag create "x"` |
+| `make full-deploy-with-oauth` | `python manage.py workflow full-deploy` |
+| `make status` | `python manage.py workflow status` |
+
+### Benefits Over Makefile
+
+- **Type Safety**: Typer provides parameter validation and type checking
+- **Autocomplete**: Shell completion for all commands and options
+- **Better Help**: Rich formatted help with detailed descriptions
+- **Cross-Platform**: Works on all platforms without Make dependency
+- **Programmatic Use**: Can be imported and used as a Python library
+- **Consistent API**: All commands follow the same pattern
+
+### Environment File Support
+
+All commands support custom environment files:
+
+```bash
+python manage.py --env-file .env.prod agent-engine list
+python manage.py --env-file .env.staging workflow status
+```
+
+### Shell Autocomplete
+
+Install autocomplete for your shell:
+
+```bash
+# Bash
+python manage.py --install-completion bash
+
+# Zsh
+python manage.py --install-completion zsh
+
+# Fish
+python manage.py --install-completion fish
+```
+
+### Detailed Documentation
+
+For comprehensive CLI documentation including all commands, options, and examples, see [MANAGE_CLI_USAGE.md](MANAGE_CLI_USAGE.md).
 
 ## Project Structure
 
