@@ -9,7 +9,6 @@ and deleting RAG corpora in Vertex AI.
 import os
 from pathlib import Path
 from typing import Dict, Optional, List
-import tempfile
 
 from google.auth import default
 from google.api_core.exceptions import NotFound, ResourceExhausted
