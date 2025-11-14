@@ -43,7 +43,7 @@ app = typer.Typer(
 # Debug mode configuration
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-if DEBUG or True:
+if DEBUG:
     os.environ['GRPC_VERBOSITY'] = 'DEBUG'
     os.environ['GRPC_TRACE'] = 'all'
     logging.basicConfig(level=logging.DEBUG)
