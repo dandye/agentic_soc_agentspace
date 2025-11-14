@@ -361,11 +361,7 @@ class AgentEngineManager:
                 requirements=[
                     "cloudpickle",
                     "google-adk~=1.18.0",
-                    #"google-adk>=1.15.1",
-                    "google-genai",
-                    "google-cloud-discoveryengine",
                     "google-cloud-aiplatform[agent-engines]~=1.126.1",
-                    #"google-cloud-aiplatform[agent-engines]==1.119.0",  # fixes VertexAiSessionService
                     "pydantic",
                     "python-dotenv",
                 ],
@@ -374,7 +370,7 @@ class AgentEngineManager:
                 },
                 extra_packages=[
                     "mcp-security/server",
-                    "installation_scripts/install.sh",
+                    "installation_scripts/install.sh",  # installs uvx
                     "soc_agent",  # is this needed?
                 ],
                 env_vars=env_vars,
