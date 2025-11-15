@@ -1,6 +1,7 @@
 pyink
 pre-commit
 mypy
+types-requests
 pip-audit
 pytest
 pytest-cov
