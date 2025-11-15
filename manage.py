@@ -7,12 +7,13 @@ Agentic SOC AgentSpace system including agent engines, AgentSpace apps,
 OAuth authorizations, data stores, and RAG corpora.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Annotated
 
-from rich.console import Console
 import typer
-from typing_extensions import Annotated
+from rich.console import Console
+
 
 # Import management apps from installation_scripts
 sys.path.insert(0, str(Path(__file__).parent / "installation_scripts"))
@@ -22,6 +23,7 @@ from installation_scripts.manage_agentspace import app as agentspace_app
 from installation_scripts.manage_datastore import app as datastore_app
 from installation_scripts.manage_oauth import app as oauth_app
 from installation_scripts.manage_rag import app as rag_app
+
 
 console = Console()
 
@@ -260,10 +262,10 @@ def setup(
     # Check Python dependencies
     console.print("\n[yellow]Checking Python dependencies...[/yellow]")
     try:
-        from dotenv import load_dotenv
-        import google.adk
-        import google.auth
-        import vertexai
+        import google.adk  # noqa: F401
+        import google.auth  # noqa: F401
+        import vertexai  # noqa: F401
+        from dotenv import load_dotenv  # noqa: F401
 
         console.print("[green]All required packages are installed[/green]")
     except ImportError as e:

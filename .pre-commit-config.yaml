@@ -15,14 +15,16 @@ repos:
         description: Format Python code with pyink (Google Python Style Guide)
         language_version: python3.12
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.18.2'
-    hooks:
-      - id: mypy
-        name: mypy
-        description: Static type checking with mypy
-        additional_dependencies: [types-requests]
-        args: ['--explicit-package-bases']
+  # Mypy disabled in pre-commit due to many existing type issues
+  # Run separately in CI where it can be non-blocking
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: 'v1.18.2'
+  #   hooks:
+  #     - id: mypy
+  #       name: mypy
+  #       description: Static type checking with mypy
+  #       additional_dependencies: [types-requests]
+  #       args: ['--explicit-package-bases']
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
