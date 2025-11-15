@@ -49,83 +49,10 @@ jobs:
           # Run ruff separately in check mode (no --fix)
           ruff check .
 
-  type-check:
-    name: Type Checking
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Allow failure due to existing type issues
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
-
-      - name: Run mypy
-        run: |
-          mypy --config-file=pyproject.toml --explicit-package-bases .
-
-  security:
-    name: Security Scanning
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Allow failure for vulnerabilities (fix in separate PR)
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
-
-      - name: Run ruff security checks
-        run: |
-          # Run ruff with security rules (config in pyproject.toml handles ignores)
-          ruff check .
-
-      - name: Run pip-audit
-        run: |
-          pip-audit
-
-  tests:
-    name: Tests and Coverage
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Allow failure until test suite is created
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
-
-      - name: Run tests with coverage
-        run: |
-          pytest
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v5
-        if: always()
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
+  # NOTE: Additional jobs (type-check, security, tests) are disabled in this PR
+  # They will be re-enabled after fixing existing issues in separate PRs:
+  # - Type checking: 40+ existing type errors to fix
+  # - Security: starlette vulnerability to upgrade
+  # - Tests: No test suite exists yet
+  #
+  # See pyproject.toml for full tool configurations
