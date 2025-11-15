@@ -92,7 +92,8 @@ jobs:
 
       - name: Run ruff security checks
         run: |
-          ruff check --select S .
+          # Run ruff with security rules (config in pyproject.toml handles ignores)
+          ruff check .
 
       - name: Run pip-audit
         run: |
