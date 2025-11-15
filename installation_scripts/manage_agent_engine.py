@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -305,8 +306,9 @@ class AgentEngineManager:
                 return None
 
             # Validate RAG_CORPUS_ID format
-            import re
-
+            # Pattern validates GCP resource name structure for RAG corpora.
+            # This is intentionally permissive to allow for GCP naming flexibility
+            # while catching obvious format errors (missing slashes, wrong order).
             rag_corpus_id = os.environ.get("RAG_CORPUS_ID", "")
             rag_pattern = r"^projects/[^/]+/locations/[^/]+/ragCorpora/\d+$"
             if not re.match(rag_pattern, rag_corpus_id):
