@@ -8,10 +8,11 @@ and deleting RAG corpora in Vertex AI.
 
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from google.auth import default
 from google.api_core.exceptions import NotFound, ResourceExhausted
+from google.cloud import storage
 import vertexai
 from vertexai.preview import rag
 from dotenv import load_dotenv
@@ -81,76 +82,52 @@ class RAGManager:
         List all RAG corpora in the project.
 
         Args:
-            verbose: Show detailed information for each corpus
+            verbose: Show detailed information for each corpus (excluding files to prevent loops)
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Use pagination to handle large numbers of corpora
-            # This also helps with quota limits by making smaller requests
-            # Display results as we fetch each page (streaming)
-            total_count = 0
-            page_num = 0
-            page_token = None
-            page_size = 10
-
             typer.echo()  # Blank line before output
 
-            while True:
-                page_num += 1
-                typer.echo(f"Fetching page {page_num}...")
+            # Iterate directly over the pager - don't use list() to avoid iteration issues
+            corpora = []
+            for corpus in rag.list_corpora():
+                corpora.append(corpus)
 
-                # Get the next page of results
-                pager = rag.list_corpora(page_size=page_size, page_token=page_token)
-
-                # Process and display each corpus immediately
-                page_count = 0
-                for corpus in pager:
-                    total_count += 1
-                    page_count += 1
-
-                    display_name = corpus.display_name
-                    corpus_name = corpus.name
-                    description = getattr(corpus, "description", "N/A")
-
-                    typer.echo(f"{total_count}. {display_name}")
-                    typer.echo(f"   Name: {corpus_name}")
-                    if description and description != "N/A":
-                        typer.echo(f"   Description: {description}")
-
-                    if verbose:
-                        # Show embedding model configuration
-                        if hasattr(corpus, "embedding_model_config"):
-                            config = corpus.embedding_model_config
-                            if hasattr(config, "publisher_model"):
-                                typer.echo(f"   Embedding Model: {config.publisher_model}")
-
-                        # Try to list files in the corpus
-                        try:
-                            files = list(rag.list_files(corpus_name=corpus_name))
-                            typer.echo(f"   Files: {len(files)}")
-                            if files:
-                                for file in files[:3]:  # Show first 3 files
-                                    typer.echo(f"     - {file.display_name}")
-                                if len(files) > 3:
-                                    typer.echo(f"     ... and {len(files) - 3} more")
-                        except Exception as e:
-                            typer.echo(f"   Files: Unable to retrieve ({str(e)[:50]})")
-
-                    typer.echo()
-
-                typer.echo(f"  (found {page_count} on this page)\n")
-
-                # Check for next page AFTER iterating through current page
-                page_token = getattr(pager, 'next_page_token', None)
-                if not page_token:
-                    break
-
-            if total_count == 0:
+            if not corpora:
                 typer.echo("No RAG corpora found.")
-            else:
-                typer.echo(f"Total: {total_count} RAG corpus/corpora")
+                return True
+
+            for i, corpus in enumerate(corpora, 1):
+                display_name = corpus.display_name
+                corpus_name = corpus.name
+                description = getattr(corpus, "description", "")
+
+                typer.echo(f"{i}. {display_name}")
+                typer.echo(f"   Name: {corpus_name}")
+                if description:
+                    typer.echo(f"   Description: {description}")
+
+                if verbose:
+                    # Only show embedding model in verbose mode, NOT files
+                    # File listing causes the infinite loop issue
+                    if hasattr(corpus, "embedding_model_config"):
+                        config = corpus.embedding_model_config
+                        if hasattr(config, "publisher_model"):
+                            typer.echo(f"   Embedding Model: {config.publisher_model}")
+
+                    # Show creation time if available
+                    if hasattr(corpus, "create_time"):
+                        typer.echo(f"   Created: {corpus.create_time}")
+
+                typer.echo()
+
+            typer.echo(f"Total: {len(corpora)} RAG corpus/corpora")
+
+            if verbose:
+                typer.echo()
+                typer.echo("Note: Use 'rag-info <corpus_name>' to see files in a specific corpus")
 
             return True
 
@@ -197,20 +174,28 @@ class RAGManager:
             if hasattr(corpus, "update_time"):
                 typer.echo(f"Updated: {corpus.update_time}")
 
-            # List files in the corpus
+            # List files separately - NOT during corpus iteration to avoid loops
             typer.echo("\nFiles in corpus:")
             try:
-                files = list(rag.list_files(corpus_name=corpus_name))
+                # Iterate directly over file_list pager to avoid list() conversion issues
+                files = []
+                for file in rag.list_files(corpus_name=corpus_name):
+                    files.append(file)
+
                 if files:
                     typer.echo(f"Total files: {len(files)}")
-                    for i, file in enumerate(files, 1):
-                        typer.echo(f"{i}. {file.display_name} - {file.name}")
-                        if hasattr(file, "description") and file.description:
-                            typer.echo(f"   Description: {file.description}")
+                    # Limit display to first 10 files to avoid overwhelming output
+                    for i, file in enumerate(files[:10], 1):
+                        typer.echo(f"{i}. {file.display_name}")
+                        if hasattr(file, "size_bytes"):
+                            size_mb = file.size_bytes / (1024 * 1024)
+                            typer.echo(f"   Size: {size_mb:.2f} MB")
+                    if len(files) > 10:
+                        typer.echo(f"... and {len(files) - 10} more files")
                 else:
                     typer.echo("No files found in corpus.")
             except Exception as e:
-                typer.secho(f" Error listing files: {e}", fg=typer.colors.YELLOW)
+                typer.secho(f"Note: Unable to list files: {str(e)[:100]}", fg=typer.colors.YELLOW)
 
             return True
 
@@ -248,15 +233,20 @@ class RAGManager:
             )
 
             # Check if corpus with same display name already exists
-            existing_corpora = list(rag.list_corpora())
-            for existing_corpus in existing_corpora:
-                if existing_corpus.display_name == display_name:
-                    typer.secho(
-                        f" A corpus with display name '{display_name}' already exists.",
-                        fg=typer.colors.YELLOW,
-                    )
-                    typer.echo(f"   Existing corpus: {existing_corpus.name}")
-                    return False
+            try:
+                pager = rag.list_corpora()
+                if pager:
+                    for existing_corpus in pager:
+                        if existing_corpus.display_name == display_name:
+                            typer.secho(
+                                f" A corpus with display name '{display_name}' already exists.",
+                                fg=typer.colors.YELLOW,
+                            )
+                            typer.echo(f"   Existing corpus: {existing_corpus.name}")
+                            return False
+            except Exception as e:
+                # If we can't list corpora, just proceed with creation
+                typer.echo(f"Note: Could not check for existing corpora: {e}")
 
             corpus = rag.create_corpus(
                 display_name=display_name,
@@ -270,7 +260,7 @@ class RAGManager:
             typer.echo(f"   Resource name: {corpus.name}")
             typer.echo("\n" + "=" * 80)
             typer.echo("To use this corpus, save the resource name:")
-            typer.echo(f"RAG_CORPUS={corpus.name}")
+            typer.echo(f"RAG_CORPUS_ID={corpus.name}")
             typer.echo("=" * 80)
 
             return True
@@ -287,6 +277,101 @@ class RAGManager:
             return False
         except Exception as e:
             typer.secho(f"Error creating corpus: {e}", fg=typer.colors.RED)
+            return False
+
+    def import_files(
+        self,
+        corpus_name: str,
+        gcs_paths: list,
+        chunk_size: int = 512,
+        chunk_overlap: int = 50,
+        timeout: int = 600
+    ) -> bool:
+        """
+        Import files from Google Cloud Storage into a RAG corpus.
+
+        Args:
+            corpus_name: Full resource name of the corpus
+            gcs_paths: List of GCS URIs (gs://bucket/path/to/file)
+            chunk_size: Size of text chunks for indexing
+            chunk_overlap: Overlap between chunks
+            timeout: Timeout in seconds for the operation
+
+        Returns:
+            True if successful, False otherwise
+        """
+        typer.echo(f"Importing {len(gcs_paths)} file(s) to corpus: {corpus_name}")
+        typer.echo(f"Chunk size: {chunk_size}, Overlap: {chunk_overlap}")
+        typer.echo()
+
+        try:
+            # Verify corpus exists first
+            corpus = rag.get_corpus(name=corpus_name)
+            typer.echo(f"Target corpus: {corpus.display_name}")
+            typer.echo()
+
+            # Vertex AI RAG has a limit of 25 files per import request
+            # Split into batches if needed
+            BATCH_SIZE = 25
+            total_files = len(gcs_paths)
+            total_imported = 0
+
+            if total_files > BATCH_SIZE:
+                typer.echo(f"Note: Splitting into batches of {BATCH_SIZE} files (API limit)")
+                typer.echo()
+
+            # Process in batches
+            for batch_num, i in enumerate(range(0, total_files, BATCH_SIZE), 1):
+                batch_paths = gcs_paths[i:i + BATCH_SIZE]
+                batch_count = len(batch_paths)
+
+                if total_files > BATCH_SIZE:
+                    typer.echo(f"Batch {batch_num}: Importing {batch_count} file(s)...")
+                else:
+                    typer.echo("Starting import...")
+
+                for path in batch_paths:
+                    typer.echo(f"  - {path}")
+                typer.echo()
+
+                response = rag.import_files(
+                    corpus_name=corpus_name,
+                    paths=batch_paths,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    timeout=timeout
+                )
+
+                # Show import results
+                if hasattr(response, 'imported_rag_files_count'):
+                    imported = response.imported_rag_files_count
+                    total_imported += imported
+                    typer.secho(
+                        f"Batch {batch_num}: {imported} file(s) imported successfully",
+                        fg=typer.colors.GREEN,
+                    )
+                else:
+                    typer.secho(
+                        f"Batch {batch_num}: Import initiated successfully",
+                        fg=typer.colors.GREEN,
+                    )
+                typer.echo()
+
+            typer.echo("=" * 80)
+            typer.secho(f"All batches completed!", fg=typer.colors.GREEN)
+            if total_imported > 0:
+                typer.echo(f"Total files imported: {total_imported}/{total_files}")
+            typer.echo()
+            typer.echo("Note: File processing may continue in the background.")
+            typer.echo("Use 'rag-info' to check the corpus status and file count.")
+
+            return True
+
+        except NotFound:
+            typer.secho(f"Corpus not found: {corpus_name}", fg=typer.colors.RED)
+            return False
+        except Exception as e:
+            typer.secho(f"Error importing files: {e}", fg=typer.colors.RED)
             return False
 
     def delete_corpus(self, corpus_name: str, force: bool = False) -> bool:
@@ -398,6 +483,83 @@ def delete(
     """Delete a RAG corpus."""
     manager = RAGManager(env_file)
     if not manager.delete_corpus(corpus_name, force):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def import_files(
+    corpus_name: Annotated[Optional[str], typer.Argument(help="Full resource name of the corpus (or set RAG_CORPUS_ID in .env).")] = None,
+    gcs_paths: Annotated[Optional[List[str]], typer.Argument(help="GCS paths (gs://...) to import, or omit to import all from GCS_DEFAULT_BUCKET.")] = None,
+    chunk_size: Annotated[
+        int, typer.Option("--chunk-size", "-s", help="Size of text chunks for indexing.")
+    ] = 512,
+    chunk_overlap: Annotated[
+        int, typer.Option("--chunk-overlap", "-o", help="Overlap between chunks.")
+    ] = 50,
+    timeout: Annotated[
+        int, typer.Option("--timeout", "-t", help="Timeout in seconds for the operation.")
+    ] = 600,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """Import files from GCS into a RAG corpus."""
+    manager = RAGManager(env_file)
+
+    # Get corpus name from argument or environment
+    corpus = corpus_name or manager.env_vars.get("RAG_CORPUS_ID")
+    if not corpus:
+        typer.secho(
+            "Error: Corpus name required. Provide as argument or set RAG_CORPUS_ID in .env",
+            fg=typer.colors.RED
+        )
+        raise typer.Exit(code=1)
+
+    # Handle GCS paths - either provided or auto-discover from default bucket
+    paths_to_import = gcs_paths
+
+    if not paths_to_import:
+        # Auto-discover all files from default bucket
+        default_bucket = manager.env_vars.get("GCS_DEFAULT_BUCKET")
+        if not default_bucket:
+            typer.secho(
+                "Error: No GCS paths provided and GCS_DEFAULT_BUCKET not set in .env",
+                fg=typer.colors.RED
+            )
+            typer.echo("Either provide GCS paths or set GCS_DEFAULT_BUCKET in your .env file")
+            raise typer.Exit(code=1)
+
+        try:
+            # Initialize storage client to list bucket contents
+            credentials, _ = default()
+            storage_client = storage.Client(
+                project=manager.project_id,
+                credentials=credentials
+            )
+
+            typer.echo(f"Discovering files in bucket: {default_bucket}")
+            bucket = storage_client.get_bucket(default_bucket)
+
+            # Get all files from bucket
+            paths_to_import = []
+            for blob in bucket.list_blobs():
+                uri = f"gs://{default_bucket}/{blob.name}"
+                paths_to_import.append(uri)
+
+            if not paths_to_import:
+                typer.secho(f"No files found in bucket: {default_bucket}", fg=typer.colors.YELLOW)
+                return
+
+            typer.echo(f"Found {len(paths_to_import)} file(s) to import:")
+            for uri in paths_to_import:
+                typer.echo(f"  - {uri}")
+            typer.echo()
+
+        except Exception as e:
+            typer.secho(f"Error listing bucket contents: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+    if not manager.import_files(corpus, paths_to_import, chunk_size, chunk_overlap, timeout):
         raise typer.Exit(code=1)
 
 

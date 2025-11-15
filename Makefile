@@ -11,7 +11,9 @@
 	agentspace-url agentspace-test agentspace-datastore agentspace-link-agent agentspace-unlink-agent \
 	agentspace-update-agent agentspace-list-agents agentspace-list-apps agentspace-create-app agentspace-redeploy \
 	datastore-create datastore-list datastore-info datastore-delete \
-	rag-list rag-info rag-create rag-delete \
+	rag-list rag-info rag-create rag-delete rag-import \
+	gcs-upload gcs-list gcs-delete gcs-validate gcs-uri gcs-bucket-create gcs-bucket-info \
+	vertex-ai-verify vertex-ai-enable-apis vertex-ai-quota \
 	oauth-setup oauth-create-auth oauth-verify oauth-delete \
 	redeploy-all oauth-workflow full-deploy-with-oauth status cleanup check-env lint format
 
@@ -46,6 +48,8 @@ MANAGE_AGENT_ENGINE := installation_scripts/manage_agent_engine.py
 MANAGE_OAUTH := installation_scripts/manage_oauth.py
 MANAGE_DATASTORE := installation_scripts/manage_datastore.py
 MANAGE_RAG := installation_scripts/manage_rag.py
+MANAGE_GCS := installation_scripts/manage_gcs.py
+MANAGE_VERTEX_AI := installation_scripts/manage_vertex_ai.py
 
 # Validation targets
 .PHONY: check-prereqs check-deploy check-integration
@@ -84,6 +88,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "\033[1;32mRAG Corpus Management\033[0m"
 	@grep -h -E '^rag-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;36mGCS Management\033[0m"
+	@grep -h -E '^gcs-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;34mOAuth Management\033[0m"
 	@grep -h -E '^oauth-[^:]*:.*?## .*$$' Makefile | sed 's/:.*##/##/' | awk 'BEGIN {FS = "##"} {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
@@ -124,20 +131,21 @@ clean: ## Clean up temporary files and cache
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 agent-engine-deploy: check-prereqs ## Deploy the main agent engine
-	$(Q)$(PYTHON) main.py $(VERBOSE)
+	$(Q)$(PYTHON) $(MANAGE_AGENT_ENGINE) create
 	$(Q)echo "========================================"
-	$(Q)echo "DEPLOYMENT COMPLETE - Save these values to .env:"
-	$(Q)echo "========================================"
-	$(Q)echo "Check the output above for:"
-	$(Q)echo "  AGENT_ENGINE_ID=<numeric_id>"
-	$(Q)echo "  AGENT_ENGINE_RESOURCE_NAME=<full_resource_path>"
+	$(Q)echo "Agent deployment complete - check output above for resource details"
 	$(Q)echo "========================================"
 
-agent-engine-deploy-and-delete: ## Deploy agent engine and delete after test (for development)
-	$(PYTHON) main.py --delete
+agent-engine-deploy-and-delete: check-prereqs ## Deploy agent engine and delete after test (for development)
+	$(Q)$(PYTHON) $(MANAGE_AGENT_ENGINE) create
+	@echo "Waiting for deployment to complete..."
+	@sleep 5
+	@echo "Getting the most recent agent to delete..."
+	@$(PYTHON) $(MANAGE_AGENT_ENGINE) list | head -n 20
+	@echo "Use 'make agent-engine-delete-by-index INDEX=1' to delete the most recent agent"
 
 agent-engine-test: check-deploy ## Test the deployed agent engine
-	$(PYTHON) test_agent_engine.py
+	$(PYTHON) $(MANAGE_AGENT_ENGINE) test
 
 # AgentSpace management targets
 agentspace-register: check-integration ## Register agent with AgentSpace (use FORCE=1 to force re-register)
@@ -258,12 +266,12 @@ datastore-delete: ## Delete a data store (use: DATASTORE_ID=<id> FORCE=1)
 rag-list: ## List all RAG corpora in the project (use V=1 for verbose output)
 	@$(PYTHON) $(MANAGE_RAG) list $(VERBOSE) --env-file $(ENV_FILE)
 
-rag-info: ## Get information about a specific RAG corpus (use: RAG_CORPUS_NAME=<resource_name>)
-	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
-		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-info RAG_CORPUS_NAME=<resource_name>"; \
+rag-info: ## Get information about a specific RAG corpus (use: RAG_CORPUS_ID=<resource_name>)
+	@if [ -z "$(RAG_CORPUS_ID)" ]; then \
+		echo "Error: RAG_CORPUS_ID is required. Usage: make rag-info RAG_CORPUS_ID=<resource_name>"; \
 		exit 1; \
 	fi
-	@$(PYTHON) $(MANAGE_RAG) info $(RAG_CORPUS_NAME) --env-file $(ENV_FILE)
+	@$(PYTHON) $(MANAGE_RAG) info $(RAG_CORPUS_ID) --env-file $(ENV_FILE)
 
 rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Description")
 	@if [ -z "$(NAME)" ]; then \
@@ -275,16 +283,127 @@ rag-create: ## Create a new RAG corpus (use: NAME="Corpus Name" DESC="Descriptio
 		$(if $(EMBEDDING_MODEL),--embedding-model $(EMBEDDING_MODEL)) \
 		--env-file $(ENV_FILE)
 
-rag-delete: ## Delete a RAG corpus (use: RAG_CORPUS_NAME=<resource_name> FORCE=1)
-	@if [ -z "$(RAG_CORPUS_NAME)" ]; then \
-		echo "Error: RAG_CORPUS_NAME is required. Usage: make rag-delete RAG_CORPUS_NAME=<resource_name>"; \
+rag-delete: ## Delete a RAG corpus (use: RAG_CORPUS_ID=<resource_name> FORCE=1)
+	@if [ -z "$(RAG_CORPUS_ID)" ]; then \
+		echo "Error: RAG_CORPUS_ID is required. Usage: make rag-delete RAG_CORPUS_ID=<resource_name>"; \
 		exit 1; \
 	fi
 	@if [ "$(FORCE)" = "1" ]; then \
-		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --force --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_ID) --force --env-file $(ENV_FILE); \
 	else \
-		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_NAME) --env-file $(ENV_FILE); \
+		$(PYTHON) $(MANAGE_RAG) delete $(RAG_CORPUS_ID) --env-file $(ENV_FILE); \
 	fi
+
+rag-import: ## Import files from GCS to RAG corpus (use: RAG_CORPUS_ID=<name> GCS_URI="gs://..." or set in .env)
+	@if [ -z "$(RAG_CORPUS_ID)" ] && [ -z "$${RAG_CORPUS_ID}" ]; then \
+		echo "Error: RAG_CORPUS_ID required. Set in .env or use RAG_CORPUS_ID=<name>"; \
+		exit 1; \
+	fi
+	@if [ -n "$(RAG_CORPUS_ID)" ]; then \
+		if [ -z "$(GCS_URI)" ]; then \
+			echo "Error: GCS_URI is required when RAG_CORPUS_ID is provided. Usage: make rag-import RAG_CORPUS_ID=<name> GCS_URI='gs://...'"; \
+			exit 1; \
+		fi; \
+		echo "Importing file to RAG corpus..."; \
+		echo "  Corpus: $(RAG_CORPUS_ID)"; \
+		echo "  File: $(GCS_URI)"; \
+		$(PYTHON) $(MANAGE_RAG) import-files $(RAG_CORPUS_ID) $(GCS_URI) \
+			$(if $(CHUNK_SIZE),--chunk-size $(CHUNK_SIZE)) \
+			$(if $(CHUNK_OVERLAP),--chunk-overlap $(CHUNK_OVERLAP)) \
+			$(if $(TIMEOUT),--timeout $(TIMEOUT)) \
+			--env-file $(ENV_FILE); \
+	else \
+		echo "Importing all files from GCS_DEFAULT_BUCKET to RAG corpus from .env..."; \
+		$(PYTHON) $(MANAGE_RAG) import-files \
+			$(if $(CHUNK_SIZE),--chunk-size $(CHUNK_SIZE)) \
+			$(if $(CHUNK_OVERLAP),--chunk-overlap $(CHUNK_OVERLAP)) \
+			$(if $(TIMEOUT),--timeout $(TIMEOUT)) \
+			--env-file $(ENV_FILE); \
+	fi
+
+# GCS Management targets
+gcs-upload: ## Upload local files to GCS (use: FILES="file1 file2" BUCKET=bucket-name RECURSIVE=1)
+	@if [ -z "$(FILES)" ]; then \
+		echo "Error: FILES is required. Usage: make gcs-upload FILES='file1 file2' BUCKET=bucket-name"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_GCS) upload $(FILES) \
+		$(if $(BUCKET),--bucket $(BUCKET)) \
+		$(if $(PATH),--path $(PATH)) \
+		$(if $(filter 1,$(RECURSIVE)),--recursive) \
+		$(if $(filter 1,$(PRESERVE_STRUCTURE)),--preserve-structure) \
+		$(if $(filter 1,$(OVERWRITE)),--overwrite) \
+		--env-file $(ENV_FILE)
+
+gcs-list: ## List GCS buckets or files (use: BUCKET=bucket-name PREFIX=path/)
+	@$(PYTHON) $(MANAGE_GCS) list \
+		$(if $(BUCKET),--bucket $(BUCKET)) \
+		$(if $(PREFIX),--prefix $(PREFIX)) \
+		$(VERBOSE) \
+		--env-file $(ENV_FILE)
+
+gcs-delete: ## Delete files from GCS (use: URI=gs://bucket/file OR BUCKET=bucket PREFIX=path/)
+	@if [ -n "$(URI)" ]; then \
+		$(PYTHON) $(MANAGE_GCS) delete $(URI) \
+			$(if $(filter 1,$(FORCE)),--force) \
+			$(if $(filter 1,$(DRY_RUN)),--dry-run) \
+			--env-file $(ENV_FILE); \
+	elif [ -n "$(BUCKET)" ] && [ -n "$(PREFIX)" ]; then \
+		$(PYTHON) $(MANAGE_GCS) delete \
+			--bucket $(BUCKET) \
+			--prefix $(PREFIX) \
+			$(if $(filter 1,$(FORCE)),--force) \
+			$(if $(filter 1,$(DRY_RUN)),--dry-run) \
+			--env-file $(ENV_FILE); \
+	else \
+		echo "Error: Provide either URI=gs://... or both BUCKET=... and PREFIX=..."; \
+		exit 1; \
+	fi
+
+gcs-validate: ## Validate files for RAG import (use: FILES="file1 file2")
+	@if [ -z "$(FILES)" ]; then \
+		echo "Error: FILES is required. Usage: make gcs-validate FILES='file1 file2'"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_GCS) validate $(FILES) --env-file $(ENV_FILE)
+
+gcs-uri: ## Generate GCS URIs for files (use: BUCKET=bucket-name PREFIX=path/ OUTPUT=uris.txt)
+	@if [ -z "$(BUCKET)" ]; then \
+		echo "Error: BUCKET is required. Usage: make gcs-uri BUCKET=bucket-name"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_GCS) uri \
+		--bucket $(BUCKET) \
+		$(if $(PREFIX),--prefix $(PREFIX)) \
+		$(if $(OUTPUT),--output $(OUTPUT)) \
+		--env-file $(ENV_FILE)
+
+gcs-bucket-create: ## Create a new GCS bucket (use: BUCKET=bucket-name LOCATION=us-central1)
+	@if [ -z "$(BUCKET)" ]; then \
+		echo "Error: BUCKET is required. Usage: make gcs-bucket-create BUCKET=bucket-name"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_GCS) bucket-create $(BUCKET) \
+		$(if $(LOCATION),--location $(LOCATION)) \
+		$(if $(STORAGE_CLASS),--storage-class $(STORAGE_CLASS)) \
+		--env-file $(ENV_FILE)
+
+gcs-bucket-info: ## Get information about a GCS bucket (use: BUCKET=bucket-name)
+	@if [ -z "$(BUCKET)" ]; then \
+		echo "Error: BUCKET is required. Usage: make gcs-bucket-info BUCKET=bucket-name"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(MANAGE_GCS) bucket-info $(BUCKET) --env-file $(ENV_FILE)
+
+# Vertex AI setup and verification targets
+vertex-ai-verify: ## Verify complete Vertex AI setup (APIs, auth, permissions)
+	@$(PYTHON) $(MANAGE_VERTEX_AI) verify --env-file $(ENV_FILE)
+
+vertex-ai-enable-apis: ## Enable all required Vertex AI APIs
+	@$(PYTHON) $(MANAGE_VERTEX_AI) enable-apis --env-file $(ENV_FILE)
+
+vertex-ai-quota: ## Display quota information for Vertex AI services
+	@$(PYTHON) $(MANAGE_VERTEX_AI) check-quota --env-file $(ENV_FILE)
 
 # OAuth management targets
 oauth-setup: ## Interactive OAuth client setup from client_secret.json (use: make oauth-setup CLIENT_SECRET=path/to/client_secret.json)
@@ -338,6 +457,15 @@ agent-engine-delete-by-resource: ## Delete Agent Engine instance by resource nam
 	else \
 		$(PYTHON) $(MANAGE_AGENT_ENGINE) delete --resource $(RESOURCE); \
 	fi
+
+agent-engine-create: check-prereqs ## Create a new Agent Engine instance (same as deploy)
+	$(PYTHON) $(MANAGE_AGENT_ENGINE) create
+
+agent-engine-create-debug: check-prereqs ## Create Agent Engine with debug logging enabled
+	$(PYTHON) $(MANAGE_AGENT_ENGINE) create --debug
+
+agent-engine-create-no-test: check-prereqs ## Create Agent Engine without running the test
+	$(PYTHON) $(MANAGE_AGENT_ENGINE) create --no-test
 
 # Workflow targets
 agent-engine-redeploy: agent-engine-deploy ## Redeploy the agent engine
