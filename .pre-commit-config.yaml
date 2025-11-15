@@ -6,9 +6,6 @@ repos:
         name: ruff
         description: Run ruff linter (replaces isort, bandit, flake8)
         args: ['--fix']
-      - id: ruff-format
-        name: ruff-format
-        description: Check formatting with ruff
 
   - repo: https://github.com/google/pyink
     rev: '24.10.1'
@@ -24,7 +21,8 @@ repos:
       - id: mypy
         name: mypy
         description: Static type checking with mypy
-        additional_dependencies: []
+        additional_dependencies: [types-requests]
+        args: ['--explicit-package-bases']
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
