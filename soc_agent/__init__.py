@@ -26,7 +26,7 @@ from .agent import (
 __version__ = "1.0.0"
 
 __all__ = [
-    'agent',
-    'create_agent',
-    'root_agent',
+    "agent",
+    "create_agent",
+    "root_agent",
 ]

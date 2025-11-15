@@ -67,7 +67,9 @@ class VertexAIManager:
         env_vars = dict(os.environ)
         return env_vars
 
-    def verify_setup(self, skip_apis: bool = False, skip_permissions: bool = False) -> bool:
+    def verify_setup(
+        self, skip_apis: bool = False, skip_permissions: bool = False
+    ) -> bool:
         """
         Run complete verification of Vertex AI setup.
 
@@ -87,7 +89,9 @@ class VertexAIManager:
         all_passed = True
 
         # Check 1: Environment variables
-        typer.secho("1. Checking environment variables...", fg=typer.colors.CYAN, bold=True)
+        typer.secho(
+            "1. Checking environment variables...", fg=typer.colors.CYAN, bold=True
+        )
         if not self._check_env_vars():
             all_passed = False
         typer.echo()
@@ -107,20 +111,26 @@ class VertexAIManager:
 
         # Check 4: API enablement
         if not skip_apis:
-            typer.secho("4. Checking API enablement...", fg=typer.colors.CYAN, bold=True)
+            typer.secho(
+                "4. Checking API enablement...", fg=typer.colors.CYAN, bold=True
+            )
             if not self._check_apis():
                 all_passed = False
             typer.echo()
 
         # Check 5: Vertex AI initialization
-        typer.secho("5. Testing Vertex AI initialization...", fg=typer.colors.CYAN, bold=True)
+        typer.secho(
+            "5. Testing Vertex AI initialization...", fg=typer.colors.CYAN, bold=True
+        )
         if not self._check_vertex_ai_init():
             all_passed = False
         typer.echo()
 
         # Check 6: IAM permissions (if not skipped)
         if not skip_permissions:
-            typer.secho("6. Checking IAM permissions...", fg=typer.colors.CYAN, bold=True)
+            typer.secho(
+                "6. Checking IAM permissions...", fg=typer.colors.CYAN, bold=True
+            )
             self._check_permissions()  # This is informational, doesn't fail
             typer.echo()
 
@@ -131,7 +141,9 @@ class VertexAIManager:
             typer.secho("Vertex AI is properly configured.", fg=typer.colors.GREEN)
         else:
             typer.secho("✗ Some checks failed", fg=typer.colors.RED, bold=True)
-            typer.secho("Please fix the issues above before proceeding.", fg=typer.colors.RED)
+            typer.secho(
+                "Please fix the issues above before proceeding.", fg=typer.colors.RED
+            )
         typer.secho("=" * 80, fg=typer.colors.BLUE)
         typer.echo()
 
@@ -159,7 +171,10 @@ class VertexAIManager:
         if rag_location:
             typer.secho(f"  ✓ RAG_GCP_LOCATION: {rag_location}", fg=typer.colors.GREEN)
         else:
-            typer.secho(f"  ℹ RAG_GCP_LOCATION: Not set (will use GCP_LOCATION)", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"  ℹ RAG_GCP_LOCATION: Not set (will use GCP_LOCATION)",
+                fg=typer.colors.YELLOW,
+            )
 
         return all_present
 
@@ -168,39 +183,64 @@ class VertexAIManager:
         try:
             credentials, project = default()
             self.credentials = credentials
-            typer.secho(f"  ✓ Application Default Credentials found", fg=typer.colors.GREEN)
+            typer.secho(
+                f"  ✓ Application Default Credentials found", fg=typer.colors.GREEN
+            )
             if project:
-                typer.secho(f"  ✓ Authenticated project: {project}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"  ✓ Authenticated project: {project}", fg=typer.colors.GREEN
+                )
             return True
         except DefaultCredentialsError as e:
             typer.secho(f"  ✗ Authentication failed: {e}", fg=typer.colors.RED)
             typer.echo()
             typer.echo("  To fix, run:")
-            typer.secho(f"    gcloud auth application-default login", fg=typer.colors.YELLOW)
-            typer.secho(f"    gcloud auth application-default set-quota-project {self.project_id}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"    gcloud auth application-default login", fg=typer.colors.YELLOW
+            )
+            typer.secho(
+                f"    gcloud auth application-default set-quota-project {self.project_id}",
+                fg=typer.colors.YELLOW,
+            )
             return False
 
     def _check_project_access(self) -> bool:
         """Verify access to the configured GCP project."""
         try:
             result = subprocess.run(
-                ["gcloud", "projects", "describe", self.project_id, "--format=value(projectId)"],
+                [
+                    "gcloud",
+                    "projects",
+                    "describe",
+                    self.project_id,
+                    "--format=value(projectId)",
+                ],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             if result.returncode == 0:
-                typer.secho(f"  ✓ Project accessible: {self.project_id}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"  ✓ Project accessible: {self.project_id}", fg=typer.colors.GREEN
+                )
                 return True
             else:
-                typer.secho(f"  ✗ Cannot access project: {self.project_id}", fg=typer.colors.RED)
+                typer.secho(
+                    f"  ✗ Cannot access project: {self.project_id}", fg=typer.colors.RED
+                )
                 typer.secho(f"    Error: {result.stderr.strip()}", fg=typer.colors.RED)
                 return False
         except subprocess.TimeoutExpired:
-            typer.secho(f"  ⚠ Project check timed out (gcloud may need auth refresh)", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"  ⚠ Project check timed out (gcloud may need auth refresh)",
+                fg=typer.colors.YELLOW,
+            )
             return True  # Don't fail on timeout, credentials might still work
         except FileNotFoundError:
-            typer.secho(f"  ⚠ gcloud CLI not found (skipping project check)", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"  ⚠ gcloud CLI not found (skipping project check)",
+                fg=typer.colors.YELLOW,
+            )
             return True  # Don't fail if gcloud not installed
 
     def _check_apis(self) -> bool:
@@ -217,7 +257,10 @@ class VertexAIManager:
         if not all_enabled:
             typer.echo()
             typer.echo("  To enable required APIs, run:")
-            typer.secho(f"    gcloud services enable {' '.join(self.REQUIRED_APIS)} --project={self.project_id}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"    gcloud services enable {' '.join(self.REQUIRED_APIS)} --project={self.project_id}",
+                fg=typer.colors.YELLOW,
+            )
 
         return all_enabled
 
@@ -225,10 +268,18 @@ class VertexAIManager:
         """Check if a specific API is enabled."""
         try:
             result = subprocess.run(
-                ["gcloud", "services", "list", "--enabled", f"--filter=name:{api}", "--format=value(name)", f"--project={self.project_id}"],
+                [
+                    "gcloud",
+                    "services",
+                    "list",
+                    "--enabled",
+                    f"--filter=name:{api}",
+                    "--format=value(name)",
+                    f"--project={self.project_id}",
+                ],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             return api in result.stdout
         except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -241,16 +292,18 @@ class VertexAIManager:
             location = self.env_vars.get("RAG_GCP_LOCATION") or self.location
 
             vertexai.init(
-                project=self.project_id,
-                location=location,
-                credentials=self.credentials
+                project=self.project_id, location=location, credentials=self.credentials
             )
-            typer.secho(f"  ✓ Vertex AI initialized successfully", fg=typer.colors.GREEN)
+            typer.secho(
+                f"  ✓ Vertex AI initialized successfully", fg=typer.colors.GREEN
+            )
             typer.secho(f"    Project: {self.project_id}", fg=typer.colors.GREEN)
             typer.secho(f"    Location: {location}", fg=typer.colors.GREEN)
             return True
         except Exception as e:
-            typer.secho(f"  ✗ Vertex AI initialization failed: {e}", fg=typer.colors.RED)
+            typer.secho(
+                f"  ✗ Vertex AI initialization failed: {e}", fg=typer.colors.RED
+            )
             return False
 
     def _check_permissions(self) -> None:
@@ -265,20 +318,28 @@ class VertexAIManager:
                 ["gcloud", "config", "get-value", "account"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             user_email = result.stdout.strip()
             if not user_email:
-                typer.secho("  ℹ Unable to determine current user", fg=typer.colors.YELLOW)
+                typer.secho(
+                    "  ℹ Unable to determine current user", fg=typer.colors.YELLOW
+                )
                 return
 
             typer.echo(f"  Current user: {user_email}")
             typer.echo(f"  Required roles: {', '.join(self.REQUIRED_ROLES)}")
             typer.echo()
-            typer.secho("  Note: Use GCP Console IAM page to verify permissions", fg=typer.colors.CYAN)
+            typer.secho(
+                "  Note: Use GCP Console IAM page to verify permissions",
+                fg=typer.colors.CYAN,
+            )
 
         except (subprocess.TimeoutExpired, FileNotFoundError):
-            typer.secho("  ℹ Could not check permissions (gcloud CLI issue)", fg=typer.colors.YELLOW)
+            typer.secho(
+                "  ℹ Could not check permissions (gcloud CLI issue)",
+                fg=typer.colors.YELLOW,
+            )
 
     def enable_apis(self) -> bool:
         """Enable all required APIs."""
@@ -288,7 +349,11 @@ class VertexAIManager:
         apis_to_enable = self.REQUIRED_APIS.copy()
 
         try:
-            cmd = ["gcloud", "services", "enable"] + apis_to_enable + [f"--project={self.project_id}"]
+            cmd = (
+                ["gcloud", "services", "enable"]
+                + apis_to_enable
+                + [f"--project={self.project_id}"]
+            )
             typer.echo(f"Running: {' '.join(cmd)}")
             typer.echo()
 
@@ -297,7 +362,9 @@ class VertexAIManager:
             if result.returncode == 0:
                 typer.secho("✓ APIs enabled successfully", fg=typer.colors.GREEN)
                 typer.echo()
-                typer.echo("Note: It may take a few minutes for APIs to be fully active")
+                typer.echo(
+                    "Note: It may take a few minutes for APIs to be fully active"
+                )
                 return True
             else:
                 typer.secho("✗ Failed to enable APIs", fg=typer.colors.RED)
@@ -367,11 +434,17 @@ def check_quota(
     typer.echo()
 
     typer.echo("To view current quota usage:")
-    typer.secho(f"  gcloud services quota list --service=aiplatform.googleapis.com --project={manager.project_id}", fg=typer.colors.YELLOW)
+    typer.secho(
+        f"  gcloud services quota list --service=aiplatform.googleapis.com --project={manager.project_id}",
+        fg=typer.colors.YELLOW,
+    )
     typer.echo()
 
     typer.echo("To request quota increase:")
-    typer.secho("  https://cloud.google.com/docs/quotas/help/request_increase", fg=typer.colors.YELLOW)
+    typer.secho(
+        "  https://cloud.google.com/docs/quotas/help/request_increase",
+        fg=typer.colors.YELLOW,
+    )
     typer.echo()
 
 
