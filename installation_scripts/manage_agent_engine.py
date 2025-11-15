@@ -307,10 +307,11 @@ class AgentEngineManager:
 
             # Validate RAG_CORPUS_ID format
             # Pattern validates GCP resource name structure for RAG corpora.
+            # Supports both numeric and alphanumeric corpus IDs with common separators.
             # This is intentionally permissive to allow for GCP naming flexibility
             # while catching obvious format errors (missing slashes, wrong order).
             rag_corpus_id = os.environ.get("RAG_CORPUS_ID", "")
-            rag_pattern = r"^projects/[^/]+/locations/[^/]+/ragCorpora/\d+$"
+            rag_pattern = r"^projects/[^/]+/locations/[^/]+/ragCorpora/[a-zA-Z0-9_-]+$"
             if not re.match(rag_pattern, rag_corpus_id):
                 typer.secho(
                     f" Invalid RAG_CORPUS_ID format: {rag_corpus_id}",
