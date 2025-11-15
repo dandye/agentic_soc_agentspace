@@ -610,4 +610,3 @@ Vertex AI charges per API call. Security products require separate licensing.
 - [MCP Protocol](https://modelcontextprotocol.io/) - Model Context Protocol specification
 - [Chronicle Docs](https://cloud.google.com/chronicle/docs) - SIEM documentation
 - [Security Command Center](https://cloud.google.com/security-command-center/docs) - Cloud security docs
-
