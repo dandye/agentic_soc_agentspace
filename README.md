@@ -457,6 +457,40 @@ For comprehensive CLI documentation including all commands, options, and example
 
 ## Development
 
+### Code Quality and Testing
+
+This project uses a modern code quality stack to maintain security-critical code:
+
+**Install development tools:**
+```bash
+pip install -r requirements-dev.txt
+```
+
+**Pre-commit hooks (automatic on git commit):**
+```bash
+pre-commit install              # Install hooks
+pre-commit run --all-files      # Run manually
+```
+
+**Run code quality checks:**
+```bash
+ruff check .                    # Linting and security checks
+ruff check --fix .              # Auto-fix issues
+pyink .                         # Format code (Google style)
+mypy .                          # Type checking
+pytest                          # Run tests with coverage
+pip-audit                       # Dependency vulnerability scan
+```
+
+**Tools used:**
+- **pyink**: Code formatting (Google Python Style Guide)
+- **ruff**: Fast linting, import sorting, security checks
+- **mypy**: Static type checking
+- **pytest**: Testing with coverage reporting
+- **pip-audit**: Dependency vulnerability scanning
+
+**CI/CD:** All PRs run automated checks for linting, type checking, security scanning, and test coverage.
+
 ### Customizing the Agent
 
 Edit `main.py` to customize:

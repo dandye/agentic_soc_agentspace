@@ -240,6 +240,56 @@ Tests individual MCP server in isolation.
 - **Vertex AI SDK**: `google-cloud-aiplatform[agent-engines]`
 - **MCP Protocol**: Model Context Protocol client/server (`mcp`)
 
+## Code Quality Tools
+
+This project uses a modern code quality stack for maintaining security-critical code:
+
+### Development Tools
+```bash
+pip install -r requirements-dev.txt
+```
+
+**Installed tools:**
+- **pyink**: Code formatting (Google Python Style Guide)
+- **ruff**: Fast linting, import sorting, security checks (replaces isort, bandit, flake8)
+- **mypy**: Static type checking
+- **pytest + pytest-cov**: Testing with coverage reporting
+- **pip-audit**: Dependency vulnerability scanning
+- **pre-commit**: Git hook management
+
+### Running Code Quality Checks
+
+**Pre-commit hooks (runs automatically on git commit):**
+```bash
+pre-commit run --all-files  # Run all hooks manually
+```
+
+**Individual tools:**
+```bash
+ruff check .                 # Linting
+ruff check --fix .           # Auto-fix issues
+ruff format .                # Check formatting (not used, pyink handles this)
+pyink .                      # Format code
+mypy .                       # Type checking
+pytest                       # Run tests with coverage
+pip-audit                    # Scan dependencies
+```
+
+### CI/CD Pipeline
+
+The `.github/workflows/code-quality.yml` workflow runs four parallel jobs on every PR:
+
+1. **Pre-commit Hooks**: ruff, pyink, mypy, trailing whitespace, EOF, YAML checks
+2. **Type Checking**: mypy static analysis
+3. **Security Scanning**: ruff security rules (S checks) + pip-audit
+4. **Tests and Coverage**: pytest with Codecov integration
+
+### Configuration Files
+
+- **pyproject.toml**: Configuration for pyink, mypy, pytest, ruff
+- **.pre-commit-config.yaml**: Pre-commit hook definitions
+- **requirements-dev.txt**: Development dependencies
+
 ## Troubleshooting
 
 Common issues:
