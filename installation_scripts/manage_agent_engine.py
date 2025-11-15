@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -287,6 +288,7 @@ class AgentEngineManager:
                 "GCP_PROJECT_ID",
                 "GCP_LOCATION",
                 "GCP_STAGING_BUCKET",
+                "CHRONICLE_PROJECT_ID",
                 "CHRONICLE_CUSTOMER_ID",
                 "CHRONICLE_SERVICE_ACCOUNT_PATH",
                 "SOAR_URL",
@@ -300,6 +302,24 @@ class AgentEngineManager:
                 typer.secho(
                     f" Missing required environment variables: {', '.join(missing_vars)}",
                     fg=typer.colors.RED,
+                )
+                return None
+
+            # Validate RAG_CORPUS_ID format
+            # Pattern validates GCP resource name structure for RAG corpora.
+            # Supports both numeric and alphanumeric corpus IDs with common separators.
+            # This is intentionally permissive to allow for GCP naming flexibility
+            # while catching obvious format errors (missing slashes, wrong order).
+            rag_corpus_id = os.environ.get("RAG_CORPUS_ID", "")
+            rag_pattern = r"^projects/[^/]+/locations/[^/]+/ragCorpora/[a-zA-Z0-9_-]+$"
+            if not re.match(rag_pattern, rag_corpus_id):
+                typer.secho(
+                    f" Invalid RAG_CORPUS_ID format: {rag_corpus_id}",
+                    fg=typer.colors.RED,
+                )
+                typer.secho(
+                    "  Expected format: projects/PROJECT_ID/locations/LOCATION/ragCorpora/CORPUS_ID",
+                    fg=typer.colors.YELLOW,
                 )
                 return None
 
@@ -340,7 +360,7 @@ class AgentEngineManager:
 
             # Get environment variables for deployment
             env_vars = {
-                "CHRONICLE_PROJECT_ID": os.environ.get("GCP_PROJECT_ID"),
+                "CHRONICLE_PROJECT_ID": os.environ.get("CHRONICLE_PROJECT_ID"),
                 "CHRONICLE_CUSTOMER_ID": os.environ.get("CHRONICLE_CUSTOMER_ID"),
                 "CHRONICLE_REGION": os.environ.get("CHRONICLE_REGION", "us"),
                 "GOOGLE_GENAI_USE_VERTEXAI": os.environ.get(
