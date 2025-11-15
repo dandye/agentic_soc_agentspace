@@ -304,6 +304,22 @@ class AgentEngineManager:
                 )
                 return None
 
+            # Validate RAG_CORPUS_ID format
+            import re
+
+            rag_corpus_id = os.environ.get("RAG_CORPUS_ID", "")
+            rag_pattern = r"^projects/[^/]+/locations/[^/]+/ragCorpora/\d+$"
+            if not re.match(rag_pattern, rag_corpus_id):
+                typer.secho(
+                    f" Invalid RAG_CORPUS_ID format: {rag_corpus_id}",
+                    fg=typer.colors.RED,
+                )
+                typer.secho(
+                    "  Expected format: projects/PROJECT_ID/locations/LOCATION/ragCorpora/CORPUS_ID",
+                    fg=typer.colors.YELLOW,
+                )
+                return None
+
             # Initialize Vertex AI
             typer.echo("Initializing Vertex AI...")
             GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
