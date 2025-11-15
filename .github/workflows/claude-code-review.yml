@@ -40,6 +40,8 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
+            CRITICAL INSTRUCTION: Never use emojis in your review. Zero emojis. None. This is non-negotiable.
+
             Please review this pull request and provide feedback on:
             - Code quality and best practices: conform to the Google Python Style Guide
             - Potential bugs or issues
@@ -49,6 +51,8 @@ jobs:
             Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+
+            Remember: Absolutely no emojis in your review comments.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
