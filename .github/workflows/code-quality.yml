@@ -32,9 +32,9 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install pre-commit
+      - name: Install dependencies
         run: |
-          pip install pre-commit
+          pip install pre-commit ruff
 
       - name: Cache pre-commit environments
         uses: actions/cache@v4
