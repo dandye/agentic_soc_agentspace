@@ -86,6 +86,10 @@ def create_agent():
         logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
     # Get service account filename for MCP servers
+    if not CHRONICLE_SERVICE_ACCOUNT_PATH:
+        raise ValueError(
+            "CHRONICLE_SERVICE_ACCOUNT_PATH is required. Please set it in your .env file."
+        )
     service_account_path = Path(CHRONICLE_SERVICE_ACCOUNT_PATH)
     service_account_filename = service_account_path.name
 

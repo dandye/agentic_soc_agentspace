@@ -287,6 +287,7 @@ class AgentEngineManager:
                 "GCP_PROJECT_ID",
                 "GCP_LOCATION",
                 "GCP_STAGING_BUCKET",
+                "CHRONICLE_PROJECT_ID",
                 "CHRONICLE_CUSTOMER_ID",
                 "CHRONICLE_SERVICE_ACCOUNT_PATH",
                 "SOAR_URL",
