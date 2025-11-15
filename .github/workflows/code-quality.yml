@@ -44,7 +44,10 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          pre-commit run --all-files --show-diff-on-failure
+          # Run without modifying files (check mode only for CI)
+          SKIP=ruff pre-commit run --all-files --show-diff-on-failure
+          # Run ruff separately in check mode (no --fix)
+          ruff check .
 
   type-check:
     name: Type Checking

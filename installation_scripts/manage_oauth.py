@@ -9,16 +9,15 @@ creating, updating, and deleting OAuth authorizations.
 import json
 import os
 from pathlib import Path
-import sys
-from typing import Any, Dict, Optional, Tuple
+from typing import Annotated, Any
 
-from dotenv import load_dotenv
 import google.auth
-from google.auth.transport import requests as google_requests
 import google_auth_oauthlib.flow
 import requests
 import typer
-from typing_extensions import Annotated
+from dotenv import load_dotenv
+from google.auth.transport import requests as google_requests
+
 
 app = typer.Typer(
     add_completion=False,
@@ -42,7 +41,7 @@ class OAuthManager:
         self.env_vars = self._load_env_vars()
         self.creds, self.project = google.auth.default()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file using python-dotenv."""
         # Load .env file into environment
         if self.env_file.exists():
@@ -60,7 +59,7 @@ class OAuthManager:
 
         lines = []
         if self.env_file.exists():
-            with open(self.env_file, "r") as f:
+            with open(self.env_file) as f:
                 lines = f.readlines()
 
         # Find existing key or add new one
@@ -82,7 +81,7 @@ class OAuthManager:
         # Update in-memory env_vars
         self.env_vars[key] = value
 
-    def _get_access_token(self) -> Optional[str]:
+    def _get_access_token(self) -> str | None:
         """Get Google Cloud access token."""
         if not self.creds.valid:
             self.creds.refresh(google_requests.Request())
@@ -93,7 +92,7 @@ class OAuthManager:
         client_secret_file: Path,
         scopes: list[str],
         redirect_uri: str = "https://vertexaisearch.cloud.google.com/oauth-redirect",
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         Generate OAuth authorization URI from client secret file.
 
@@ -112,7 +111,7 @@ class OAuthManager:
             raise typer.Exit(1)
 
         # Read client secret to extract client_id and client_secret
-        with open(client_secret_file, "r") as f:
+        with open(client_secret_file) as f:
             client_config = json.load(f)
 
         if "web" in client_config:
@@ -251,7 +250,7 @@ class OAuthManager:
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
-    def get_authorization(self, auth_id: str) -> Optional[Dict[str, Any]]:
+    def get_authorization(self, auth_id: str) -> dict[str, Any] | None:
         """
         Get OAuth authorization details from Discovery Engine.
 
@@ -299,7 +298,7 @@ def setup(
         Path, typer.Option("--env-file", "-e", help="Path to environment file")
     ] = Path(".env"),
     scopes: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--scopes", "-s", help="Comma-separated OAuth scopes"),
     ] = None,
 ):
@@ -355,7 +354,7 @@ def setup(
 @app.command()
 def create_auth(
     auth_id: Annotated[
-        Optional[str], typer.Option("--auth-id", "-i", help="Authorization ID")
+        str | None, typer.Option("--auth-id", "-i", help="Authorization ID")
     ] = None,
     env_file: Annotated[
         Path, typer.Option("--env-file", "-e", help="Path to environment file")
@@ -409,7 +408,7 @@ def create_auth(
 @app.command()
 def verify(
     auth_id: Annotated[
-        Optional[str], typer.Option("--auth-id", "-i", help="Authorization ID")
+        str | None, typer.Option("--auth-id", "-i", help="Authorization ID")
     ] = None,
     env_file: Annotated[
         Path, typer.Option("--env-file", "-e", help="Path to environment file")
@@ -444,7 +443,7 @@ def verify(
 @app.command()
 def delete(
     auth_id: Annotated[
-        Optional[str], typer.Option("--auth-id", "-i", help="Authorization ID")
+        str | None, typer.Option("--auth-id", "-i", help="Authorization ID")
     ] = None,
     env_file: Annotated[
         Path, typer.Option("--env-file", "-e", help="Path to environment file")

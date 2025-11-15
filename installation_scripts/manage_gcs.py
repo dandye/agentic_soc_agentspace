@@ -6,19 +6,18 @@ This script manages GCS operations for uploading local files
 to be imported into Vertex AI RAG corpora.
 """
 
-from datetime import datetime
+import builtins
 import mimetypes
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Annotated
 
+import typer
 from dotenv import load_dotenv
 from google.auth import default
 from google.cloud import storage
-from google.cloud.exceptions import Conflict
-from google.cloud.exceptions import NotFound
-import typer
-from typing_extensions import Annotated
+from google.cloud.exceptions import Conflict, NotFound
+
 
 app = typer.Typer(
     add_completion=False,
@@ -48,7 +47,7 @@ class GCSManager:
         self.storage_client = None
         self._initialize_gcs()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from .env file."""
         if self.env_file.exists():
             load_dotenv(self.env_file, override=True)
@@ -76,9 +75,7 @@ class GCSManager:
             typer.secho(f" Failed to initialize GCS client: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-    def _get_or_create_bucket(
-        self, bucket_name: Optional[str] = None
-    ) -> storage.Bucket:
+    def _get_or_create_bucket(self, bucket_name: str | None = None) -> storage.Bucket:
         """
         Get existing bucket or create if it doesn't exist.
 
@@ -110,7 +107,7 @@ class GCSManager:
                 typer.secho(f"Error creating bucket '{name}': {e}", fg=typer.colors.RED)
                 raise
 
-    def validate_file(self, file_path: Path) -> Tuple[bool, str]:
+    def validate_file(self, file_path: Path) -> tuple[bool, str]:
         """
         Validate a file for RAG import.
 
@@ -149,8 +146,8 @@ class GCSManager:
     def upload_file(
         self,
         file_path: Path,
-        bucket_name: Optional[str] = None,
-        gcs_path: Optional[str] = None,
+        bucket_name: str | None = None,
+        gcs_path: str | None = None,
         overwrite: bool = False,
     ) -> str:
         """
@@ -212,11 +209,11 @@ class GCSManager:
 
     def upload_files(
         self,
-        file_paths: List[Path],
-        bucket_name: Optional[str] = None,
-        gcs_path_prefix: Optional[str] = None,
+        file_paths: list[Path],
+        bucket_name: str | None = None,
+        gcs_path_prefix: str | None = None,
         overwrite: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Upload multiple files to GCS.
 
@@ -306,8 +303,8 @@ class GCSManager:
 
     def list_files(
         self,
-        bucket_name: Optional[str] = None,
-        prefix: Optional[str] = None,
+        bucket_name: str | None = None,
+        prefix: str | None = None,
         verbose: bool = False,
     ) -> bool:
         """
@@ -498,7 +495,7 @@ class GCSManager:
     def create_bucket(
         self,
         bucket_name: str,
-        location: Optional[str] = None,
+        location: str | None = None,
         storage_class: str = "STANDARD",
     ) -> bool:
         """
@@ -603,9 +600,9 @@ class GCSManager:
 
     def generate_uris(
         self,
-        bucket_name: Optional[str] = None,
-        prefix: Optional[str] = None,
-        output_file: Optional[Path] = None,
+        bucket_name: str | None = None,
+        prefix: str | None = None,
+        output_file: Path | None = None,
     ) -> bool:
         """
         Generate GCS URIs for files in a bucket.
@@ -656,13 +653,13 @@ class GCSManager:
 @app.command()
 def upload(
     files: Annotated[
-        List[Path], typer.Argument(help="Local files or directories to upload.")
+        list[Path], typer.Argument(help="Local files or directories to upload.")
     ],
     bucket: Annotated[
-        Optional[str], typer.Option("--bucket", "-b", help="Target bucket name.")
+        str | None, typer.Option("--bucket", "-b", help="Target bucket name.")
     ] = None,
     path: Annotated[
-        Optional[str], typer.Option("--path", "-p", help="Path prefix in bucket.")
+        str | None, typer.Option("--path", "-p", help="Path prefix in bucket.")
     ] = None,
     recursive: Annotated[
         bool, typer.Option("--recursive", "-r", help="Recursively upload directories.")
@@ -772,11 +769,11 @@ def upload(
 @app.command()
 def list(
     bucket: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--bucket", "-b", help="Bucket name to list files from."),
     ] = None,
     prefix: Annotated[
-        Optional[str], typer.Option("--prefix", "-p", help="Filter by prefix.")
+        str | None, typer.Option("--prefix", "-p", help="Filter by prefix.")
     ] = None,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show detailed information.")
@@ -801,14 +798,14 @@ def list(
 @app.command()
 def delete(
     uri: Annotated[
-        Optional[str], typer.Argument(help="GCS URI to delete (gs://...).")
+        str | None, typer.Argument(help="GCS URI to delete (gs://...).")
     ] = None,
     bucket: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--bucket", "-b", help="Bucket name (for prefix deletion)."),
     ] = None,
     prefix: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--prefix", "-p", help="Delete all files with this prefix."),
     ] = None,
     force: Annotated[
@@ -843,7 +840,9 @@ def delete(
 
 @app.command()
 def validate(
-    files: Annotated[List[Path], typer.Argument(help="Local files to validate.")],
+    files: Annotated[
+        builtins.list[Path], typer.Argument(help="Local files to validate.")
+    ],
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
     ] = Path(".env"),
@@ -878,10 +877,10 @@ def validate(
 def uri(
     bucket: Annotated[str, typer.Option("--bucket", "-b", help="Bucket name.")],
     prefix: Annotated[
-        Optional[str], typer.Option("--prefix", "-p", help="Filter by prefix.")
+        str | None, typer.Option("--prefix", "-p", help="Filter by prefix.")
     ] = None,
     output: Annotated[
-        Optional[Path], typer.Option("--output", "-o", help="Output file for URIs.")
+        Path | None, typer.Option("--output", "-o", help="Output file for URIs.")
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -898,7 +897,7 @@ def uri(
 def bucket_create(
     name: Annotated[str, typer.Argument(help="Bucket name to create.")],
     location: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--location", "-l", help="Bucket location (e.g., us-central1)."),
     ] = None,
     storage_class: Annotated[

@@ -7,24 +7,26 @@ listing, testing, and deleting deployed agent engines.
 """
 
 import asyncio
-from datetime import datetime
 import json
 import logging
 import os
-from pathlib import Path
 import sys
-from typing import Dict, List, Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Annotated
 
+import typer
+import vertexai
 from dotenv import load_dotenv
 from google.api_core import client_options
 from google.cloud import aiplatform
-from google.cloud.aiplatform_v1beta1 import DeleteReasoningEngineRequest
-from google.cloud.aiplatform_v1beta1 import ReasoningEngineServiceClient
-import typer
-from typing_extensions import Annotated
-import vertexai
+from google.cloud.aiplatform_v1beta1 import (
+    DeleteReasoningEngineRequest,
+    ReasoningEngineServiceClient,
+)
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
+
 
 # Import SOC Agent package
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import shutil
 
 from soc_agent import create_agent
+
 
 app = typer.Typer(
     add_completion=False,
@@ -66,7 +69,7 @@ class AgentEngineManager:
         self.location = None
         self._initialize_vertex_ai()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file."""
         if self.env_file.exists():
             load_dotenv(self.env_file, override=True)
@@ -102,7 +105,7 @@ class AgentEngineManager:
             return dt.strftime("%Y-%m-%d %H:%M:%S")
         return "N/A"
 
-    def list_agents(self, verbose: bool = False) -> List[dict]:
+    def list_agents(self, verbose: bool = False) -> list[dict]:
         """
         List all Agent Engine instances.
 
@@ -249,7 +252,7 @@ class AgentEngineManager:
         agent = agents[index - 1]
         return self.delete_agent(agent["resource_name"], force)
 
-    def create_agent(self, debug: bool = False, no_test: bool = False) -> Optional[str]:
+    def create_agent(self, debug: bool = False, no_test: bool = False) -> str | None:
         """
         Create and deploy a new Agent Engine instance.
 
@@ -647,13 +650,13 @@ def list(
 @app.command()
 def delete(
     resource: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--resource", "-r", help="Full resource name of the agent to delete"
         ),
     ] = None,
     index: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--index", "-i", help="Index of the agent from the list to delete"
         ),
@@ -725,13 +728,13 @@ def create(
 @app.command()
 def test(
     resource: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--resource", "-r", help="Full resource name of the agent to test"
         ),
     ] = None,
     index: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--index", "-i", help="Index of the agent from the list to test"),
     ] = None,
     env_file: Annotated[
@@ -780,13 +783,13 @@ def test(
 @app.command()
 def inspect(
     resource: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--resource", "-r", help="Full resource name of the agent to inspect"
         ),
     ] = None,
     index: Annotated[
-        Optional[int],
+        int | None,
         typer.Option(
             "--index", "-i", help="Index of the agent from the list to inspect"
         ),
