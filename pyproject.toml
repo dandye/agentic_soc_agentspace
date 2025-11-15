@@ -89,6 +89,8 @@ ignore = [
   "E501",  # line too long (handled by pyink)
   "S113",  # requests timeout - TODO: add timeouts in future PR
   "S107",  # hardcoded password - false positives on "token_uri" etc
+  "B904",  # raise from within except - allow for cleaner error messages
+  "B007",  # unused loop variable - common pattern in os.walk
 ]
 
 [tool.ruff.lint.per-file-ignores]

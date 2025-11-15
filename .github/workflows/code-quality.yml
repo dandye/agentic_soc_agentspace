@@ -66,7 +66,7 @@ jobs:
 
       - name: Run mypy
         run: |
-          mypy --config-file=pyproject.toml .
+          mypy --config-file=pyproject.toml --explicit-package-bases .
 
   security:
     name: Security Scanning
