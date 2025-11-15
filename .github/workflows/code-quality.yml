@@ -7,6 +7,7 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - 'requirements-dev.txt'
+      - 'requirements.txt'
       - '.github/workflows/code-quality.yml'
   push:
     branches:
@@ -15,35 +16,11 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - 'requirements-dev.txt'
+      - 'requirements.txt'
 
 jobs:
-  formatting:
-    name: Check Code Formatting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install formatting tools
-        run: |
-          pip install -r requirements-dev.txt
-
-      - name: Check formatting with pyink
-        run: |
-          pyink --check --diff .
-
-      - name: Check import sorting with isort
-        run: |
-          isort --check-only --diff .
-
   pre-commit:
-    name: Run pre-commit hooks
+    name: Pre-commit Hooks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,3 +45,80 @@ jobs:
       - name: Run pre-commit hooks
         run: |
           pre-commit run --all-files --show-diff-on-failure
+
+  type-check:
+    name: Type Checking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
+
+      - name: Run mypy
+        run: |
+          mypy --config-file=pyproject.toml .
+
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
+
+      - name: Run ruff security checks
+        run: |
+          ruff check --select S .
+
+      - name: Run pip-audit
+        run: |
+          pip-audit
+
+  tests:
+    name: Tests and Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
