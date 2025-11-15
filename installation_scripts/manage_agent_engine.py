@@ -341,7 +341,7 @@ class AgentEngineManager:
 
             # Get environment variables for deployment
             env_vars = {
-                "CHRONICLE_PROJECT_ID": os.environ.get("GCP_PROJECT_ID"),
+                "CHRONICLE_PROJECT_ID": os.environ.get("CHRONICLE_PROJECT_ID"),
                 "CHRONICLE_CUSTOMER_ID": os.environ.get("CHRONICLE_CUSTOMER_ID"),
                 "CHRONICLE_REGION": os.environ.get("CHRONICLE_REGION", "us"),
                 "GOOGLE_GENAI_USE_VERTEXAI": os.environ.get(
