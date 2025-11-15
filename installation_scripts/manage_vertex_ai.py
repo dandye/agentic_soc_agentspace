@@ -7,16 +7,16 @@ API enablement, authentication, permissions, and quota status.
 """
 
 import os
-from pathlib import Path
 import subprocess
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Annotated
 
+import typer
+import vertexai
 from dotenv import load_dotenv
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
-import typer
-from typing_extensions import Annotated
-import vertexai
+
 
 app = typer.Typer(
     add_completion=False,
@@ -60,7 +60,7 @@ class VertexAIManager:
         self.location = None
         self.credentials = None
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file."""
         if self.env_file.exists():
             load_dotenv(self.env_file, override=True)
@@ -172,7 +172,7 @@ class VertexAIManager:
             typer.secho(f"  ✓ RAG_GCP_LOCATION: {rag_location}", fg=typer.colors.GREEN)
         else:
             typer.secho(
-                f"  ℹ RAG_GCP_LOCATION: Not set (will use GCP_LOCATION)",
+                "  ℹ RAG_GCP_LOCATION: Not set (will use GCP_LOCATION)",
                 fg=typer.colors.YELLOW,
             )
 
@@ -184,7 +184,7 @@ class VertexAIManager:
             credentials, project = default()
             self.credentials = credentials
             typer.secho(
-                f"  ✓ Application Default Credentials found", fg=typer.colors.GREEN
+                "  ✓ Application Default Credentials found", fg=typer.colors.GREEN
             )
             if project:
                 typer.secho(
@@ -196,7 +196,7 @@ class VertexAIManager:
             typer.echo()
             typer.echo("  To fix, run:")
             typer.secho(
-                f"    gcloud auth application-default login", fg=typer.colors.YELLOW
+                "    gcloud auth application-default login", fg=typer.colors.YELLOW
             )
             typer.secho(
                 f"    gcloud auth application-default set-quota-project {self.project_id}",
@@ -232,13 +232,13 @@ class VertexAIManager:
                 return False
         except subprocess.TimeoutExpired:
             typer.secho(
-                f"  ⚠ Project check timed out (gcloud may need auth refresh)",
+                "  ⚠ Project check timed out (gcloud may need auth refresh)",
                 fg=typer.colors.YELLOW,
             )
             return True  # Don't fail on timeout, credentials might still work
         except FileNotFoundError:
             typer.secho(
-                f"  ⚠ gcloud CLI not found (skipping project check)",
+                "  ⚠ gcloud CLI not found (skipping project check)",
                 fg=typer.colors.YELLOW,
             )
             return True  # Don't fail if gcloud not installed
@@ -294,9 +294,7 @@ class VertexAIManager:
             vertexai.init(
                 project=self.project_id, location=location, credentials=self.credentials
             )
-            typer.secho(
-                f"  ✓ Vertex AI initialized successfully", fg=typer.colors.GREEN
-            )
+            typer.secho("  ✓ Vertex AI initialized successfully", fg=typer.colors.GREEN)
             typer.secho(f"    Project: {self.project_id}", fg=typer.colors.GREEN)
             typer.secho(f"    Location: {location}", fg=typer.colors.GREEN)
             return True

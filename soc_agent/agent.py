@@ -9,14 +9,15 @@ import logging
 import os
 from pathlib import Path
 
+import vertexai
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrieval
 from mcp import StdioServerParameters
-import vertexai
 from vertexai.preview import rag
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

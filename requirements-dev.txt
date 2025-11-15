@@ -1,3 +1,8 @@
 pyink
-isort
 pre-commit
+mypy
+types-requests
+pip-audit
+pytest
+pytest-cov
+ruff

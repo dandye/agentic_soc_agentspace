@@ -7,6 +7,7 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - 'requirements-dev.txt'
+      - 'requirements.txt'
       - '.github/workflows/code-quality.yml'
   push:
     branches:
@@ -15,35 +16,11 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - 'requirements-dev.txt'
+      - 'requirements.txt'
 
 jobs:
-  formatting:
-    name: Check Code Formatting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install formatting tools
-        run: |
-          pip install -r requirements-dev.txt
-
-      - name: Check formatting with pyink
-        run: |
-          pyink --check --diff .
-
-      - name: Check import sorting with isort
-        run: |
-          isort --check-only --diff .
-
   pre-commit:
-    name: Run pre-commit hooks
+    name: Pre-commit Hooks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -55,9 +32,9 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install pre-commit
+      - name: Install dependencies
         run: |
-          pip install pre-commit
+          pip install pre-commit ruff
 
       - name: Cache pre-commit environments
         uses: actions/cache@v4
@@ -67,4 +44,15 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          pre-commit run --all-files --show-diff-on-failure
+          # Run without modifying files (check mode only for CI)
+          SKIP=ruff pre-commit run --all-files --show-diff-on-failure
+          # Run ruff separately in check mode (no --fix)
+          ruff check .
+
+  # NOTE: Additional jobs (type-check, security, tests) are disabled in this PR
+  # They will be re-enabled after fixing existing issues in separate PRs:
+  # - Type checking: 40+ existing type errors to fix
+  # - Security: starlette vulnerability to upgrade
+  # - Tests: No test suite exists yet
+  #
+  # See pyproject.toml for full tool configurations

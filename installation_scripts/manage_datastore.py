@@ -8,14 +8,14 @@ getting information about, and deleting data stores.
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Annotated, Any
 
-from dotenv import load_dotenv
 import google.auth
-from google.auth.transport import requests as google_requests
 import requests
 import typer
-from typing_extensions import Annotated
+from dotenv import load_dotenv
+from google.auth.transport import requests as google_requests
+
 
 app = typer.Typer(
     add_completion=False,
@@ -39,14 +39,14 @@ class DataStoreManager:
         self.env_vars = self._load_env_vars()
         self.creds, self.project = google.auth.default()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file."""
         if self.env_file.exists():
             load_dotenv(self.env_file, override=True)
         env_vars = dict(os.environ)
         return env_vars
 
-    def _get_access_token(self) -> Optional[str]:
+    def _get_access_token(self) -> str | None:
         """Get Google Cloud access token."""
         if not self.creds.valid:
             self.creds.refresh(google_requests.Request())
@@ -54,7 +54,7 @@ class DataStoreManager:
 
     def _make_request(
         self, method: str, url: str, **kwargs: Any
-    ) -> Optional[requests.Response]:
+    ) -> requests.Response | None:
         """Make an authenticated request to the Discovery Engine API."""
         access_token = self._get_access_token()
         if not access_token:
@@ -85,7 +85,7 @@ class DataStoreManager:
     def create_data_store(
         self,
         display_name: str,
-        data_store_id: Optional[str] = None,
+        data_store_id: str | None = None,
         solution_type: str = "SOLUTION_TYPE_SEARCH",
         content_config: str = "CONTENT_REQUIRED",
         industry_vertical: str = "GENERIC",
@@ -293,7 +293,7 @@ def create(
         str, typer.Option("--name", "-n", help="Display name for the data store")
     ] = "datastore",
     data_store_id: Annotated[
-        Optional[str], typer.Option("--id", "-i", help="ID for the data store")
+        str | None, typer.Option("--id", "-i", help="ID for the data store")
     ] = None,
     solution_type: Annotated[
         str, typer.Option("--type", "-t", help="Solution type")

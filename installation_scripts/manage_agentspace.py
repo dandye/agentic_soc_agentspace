@@ -8,14 +8,14 @@ verification, and deletion of agents in AgentSpace.
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Annotated, Any
 
-from dotenv import load_dotenv
 import google.auth
-from google.auth.transport import requests as google_requests
 import requests
 import typer
-from typing_extensions import Annotated
+from dotenv import load_dotenv
+from google.auth.transport import requests as google_requests
+
 
 app = typer.Typer(
     add_completion=False,
@@ -50,7 +50,7 @@ class AgentSpaceManager:
         self.env_vars = self._load_env_vars()
         self.creds, self.project = google.auth.default()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file using python-dotenv."""
         # Load .env file into environment
         if self.env_file.exists():
@@ -68,7 +68,7 @@ class AgentSpaceManager:
 
         lines = []
         if self.env_file.exists():
-            with open(self.env_file, "r") as f:
+            with open(self.env_file) as f:
                 lines = f.readlines()
 
         # Find existing key or add new one
@@ -90,13 +90,13 @@ class AgentSpaceManager:
         # Update in-memory env_vars
         self.env_vars[key] = value
 
-    def _get_access_token(self) -> Optional[str]:
+    def _get_access_token(self) -> str | None:
         """Get Google Cloud access token."""
         if not self.creds.valid:
             self.creds.refresh(google_requests.Request())
         return self.creds.token
 
-    def _validate_environment(self) -> Tuple[bool, list]:
+    def _validate_environment(self) -> tuple[bool, list]:
         """Validate required environment variables for AgentSpace operations."""
         required_vars = [
             "GCP_PROJECT_ID",
@@ -110,7 +110,7 @@ class AgentSpaceManager:
 
     def _make_request(
         self, method: str, url: str, **kwargs: Any
-    ) -> Optional[requests.Response]:
+    ) -> requests.Response | None:
         """Make an authenticated request to the Discovery Engine API."""
         access_token = self._get_access_token()
         if not access_token:
@@ -133,7 +133,7 @@ class AgentSpaceManager:
                 typer.echo(f"  Response: {e.response.text}")
             return None
 
-    def _get_agent_api_url(self, agent_id: Optional[str] = None) -> str:
+    def _get_agent_api_url(self, agent_id: str | None = None) -> str:
         """Construct the API URL for AgentSpace agents."""
         project_number = self.env_vars["GCP_PROJECT_NUMBER"]
         app_id = self.env_vars["AGENTSPACE_APP_ID"]
@@ -149,7 +149,7 @@ class AgentSpaceManager:
             url += f"/{agent_id}"
         return url
 
-    def _build_agent_config(self) -> Dict[str, Any]:
+    def _build_agent_config(self) -> dict[str, Any]:
         """Build the agent configuration payload."""
         config = {
             "displayName": self.env_vars.get(
@@ -297,9 +297,9 @@ class AgentSpaceManager:
 
     def create_app(
         self,
-        app_name: Optional[str] = None,
+        app_name: str | None = None,
         solution_type: str = "SOLUTION_TYPE_SEARCH",
-        data_store_ids: Optional[list] = None,
+        data_store_ids: list | None = None,
         enable_chat: bool = False,
     ) -> bool:
         """
@@ -544,10 +544,10 @@ class AgentSpaceManager:
 
     def link_agent_to_agentspace(
         self,
-        display_name: Optional[str] = None,
-        description: Optional[str] = None,
-        tool_description: Optional[str] = None,
-        auth_id: Optional[str] = None,
+        display_name: str | None = None,
+        description: str | None = None,
+        tool_description: str | None = None,
+        auth_id: str | None = None,
     ) -> bool:
         """
         Link an existing agent engine to AgentSpace with OAuth authorization.
@@ -643,7 +643,7 @@ class AgentSpaceManager:
 
     def unlink_agent_from_agentspace(
         self,
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
         force: bool = False,
     ) -> bool:
         """
@@ -727,10 +727,10 @@ class AgentSpaceManager:
 
     def update_agent_config(
         self,
-        agent_id: Optional[str] = None,
-        display_name: Optional[str] = None,
-        description: Optional[str] = None,
-        tool_description: Optional[str] = None,
+        agent_id: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+        tool_description: str | None = None,
     ) -> bool:
         """
         Update an existing agent's configuration in AgentSpace.
@@ -1144,20 +1144,20 @@ def ensure_datastore(
 @app.command()
 def link_agent(
     display_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--display-name", help="Display name for the agent."),
     ] = None,
     description: Annotated[
-        Optional[str], typer.Option("--description", help="Description of the agent.")
+        str | None, typer.Option("--description", help="Description of the agent.")
     ] = None,
     tool_description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--tool-description", help="Description of what the agent tool does."
         ),
     ] = None,
     auth_id: Annotated[
-        Optional[str], typer.Option("--auth-id", help="OAuth authorization ID.")
+        str | None, typer.Option("--auth-id", help="OAuth authorization ID.")
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -1174,7 +1174,7 @@ def link_agent(
 @app.command()
 def unlink_agent(
     agent_id: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--agent-id", help="ID of the agent to unlink (defaults to env var)."
         ),
@@ -1195,18 +1195,18 @@ def unlink_agent(
 @app.command()
 def update_agent_config(
     agent_id: Annotated[
-        Optional[str], typer.Option("--agent-id", help="ID of the agent to update.")
+        str | None, typer.Option("--agent-id", help="ID of the agent to update.")
     ] = None,
     display_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--display-name", help="New display name for the agent."),
     ] = None,
     description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--description", help="New description of the agent."),
     ] = None,
     tool_description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--tool-description", help="New description of what the agent tool does."
         ),
@@ -1250,7 +1250,7 @@ def list_agents(
 @app.command()
 def create_app(
     app_name: Annotated[
-        Optional[str], typer.Option("--name", help="Display name for the app.")
+        str | None, typer.Option("--name", help="Display name for the app.")
     ] = None,
     solution_type: Annotated[
         str,
@@ -1259,7 +1259,7 @@ def create_app(
         ),
     ] = "SOLUTION_TYPE_SEARCH",
     data_store_id: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--data-store", help="Data store ID to associate with the app."),
     ] = None,
     enable_chat: Annotated[

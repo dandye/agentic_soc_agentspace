@@ -6,19 +6,19 @@ This script manages RAG corpus operations including listing, creating,
 and deleting RAG corpora in Vertex AI.
 """
 
+import builtins
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Annotated
 
+import typer
+import vertexai
 from dotenv import load_dotenv
-from google.api_core.exceptions import NotFound
-from google.api_core.exceptions import ResourceExhausted
+from google.api_core.exceptions import NotFound, ResourceExhausted
 from google.auth import default
 from google.cloud import storage
-import typer
-from typing_extensions import Annotated
-import vertexai
 from vertexai.preview import rag
+
 
 app = typer.Typer(
     add_completion=False,
@@ -42,7 +42,7 @@ class RAGManager:
         self.location = None
         self._initialize_vertex_ai()
 
-    def _load_env_vars(self) -> Dict[str, str]:
+    def _load_env_vars(self) -> dict[str, str]:
         """Load environment variables from the .env file."""
         if self.env_file.exists():
             load_dotenv(self.env_file, override=True)
@@ -221,7 +221,7 @@ class RAGManager:
     def create_corpus(
         self,
         display_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
         embedding_model: str = "publishers/google/models/text-embedding-004",
     ) -> bool:
         """
@@ -370,7 +370,7 @@ class RAGManager:
                 typer.echo()
 
             typer.echo("=" * 80)
-            typer.secho(f"All batches completed!", fg=typer.colors.GREEN)
+            typer.secho("All batches completed!", fg=typer.colors.GREEN)
             if total_imported > 0:
                 typer.echo(f"Total files imported: {total_imported}/{total_files}")
             typer.echo()
@@ -462,7 +462,7 @@ def info(
 def create(
     display_name: Annotated[str, typer.Argument(help="Display name for the corpus.")],
     description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--description", "-d", help="Description of the corpus."),
     ] = None,
     embedding_model: Annotated[
@@ -504,13 +504,13 @@ def delete(
 @app.command()
 def import_files(
     corpus_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(
             help="Full resource name of the corpus (or set RAG_CORPUS_ID in .env)."
         ),
     ] = None,
     gcs_paths: Annotated[
-        Optional[List[str]],
+        builtins.list[str] | None,
         typer.Argument(
             help="GCS paths (gs://...) to import, or omit to import all from GCS_DEFAULT_BUCKET."
         ),

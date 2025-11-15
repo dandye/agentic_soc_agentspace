@@ -1,4 +1,12 @@
 repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.14.5'
+    hooks:
+      - id: ruff
+        name: ruff
+        description: Run ruff linter (replaces isort, bandit, flake8)
+        args: ['--fix']
+
   - repo: https://github.com/google/pyink
     rev: '24.10.1'
     hooks:
@@ -7,16 +15,19 @@ repos:
         description: Format Python code with pyink (Google Python Style Guide)
         language_version: python3.12
 
-  - repo: https://github.com/pycqa/isort
-    rev: '5.13.2'
-    hooks:
-      - id: isort
-        name: isort
-        description: Sort Python imports using Google profile
-        args: ['--profile', 'google']
+  # Mypy disabled in pre-commit due to many existing type issues
+  # Run separately in CI where it can be non-blocking
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: 'v1.18.2'
+  #   hooks:
+  #     - id: mypy
+  #       name: mypy
+  #       description: Static type checking with mypy
+  #       additional_dependencies: [types-requests]
+  #       args: ['--explicit-package-bases']
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         name: Trim trailing whitespace
