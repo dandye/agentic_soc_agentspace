@@ -8,17 +8,17 @@ creating, updating, and deleting OAuth authorizations.
 
 import json
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import Any, Dict, Optional, Tuple
 
+from dotenv import load_dotenv
 import google.auth
 from google.auth.transport import requests as google_requests
 import google_auth_oauthlib.flow
 import requests
 import typer
 from typing_extensions import Annotated
-from dotenv import load_dotenv
 
 app = typer.Typer(
     add_completion=False,

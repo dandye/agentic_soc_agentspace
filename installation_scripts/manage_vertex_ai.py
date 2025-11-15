@@ -7,16 +7,16 @@ API enablement, authentication, permissions, and quota status.
 """
 
 import os
-import subprocess
 from pathlib import Path
-from typing import Dict, Optional, List
+import subprocess
+from typing import Dict, List, Optional
 
+from dotenv import load_dotenv
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
-import vertexai
-from dotenv import load_dotenv
 import typer
 from typing_extensions import Annotated
+import vertexai
 
 app = typer.Typer(
     add_completion=False,

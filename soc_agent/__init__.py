@@ -18,10 +18,8 @@ Usage:
 from . import agent
 
 # Also expose the main functions for convenience
-from .agent import (
-    create_agent,
-    root_agent,
-)
+from .agent import create_agent
+from .agent import root_agent
 
 __version__ = "1.0.0"
 

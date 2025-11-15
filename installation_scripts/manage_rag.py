@@ -8,16 +8,17 @@ and deleting RAG corpora in Vertex AI.
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 
-from google.auth import default
-from google.api_core.exceptions import NotFound, ResourceExhausted
-from google.cloud import storage
-import vertexai
-from vertexai.preview import rag
 from dotenv import load_dotenv
+from google.api_core.exceptions import NotFound
+from google.api_core.exceptions import ResourceExhausted
+from google.auth import default
+from google.cloud import storage
 import typer
 from typing_extensions import Annotated
+import vertexai
+from vertexai.preview import rag
 
 app = typer.Typer(
     add_completion=False,

@@ -10,11 +10,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from dotenv import load_dotenv
 import google.auth
 from google.auth.transport import requests as google_requests
 import requests
 import typer
-from dotenv import load_dotenv
 from typing_extensions import Annotated
 
 app = typer.Typer(

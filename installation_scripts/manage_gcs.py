@@ -6,16 +6,17 @@ This script manages GCS operations for uploading local files
 to be imported into Vertex AI RAG corpora.
 """
 
-import os
+from datetime import datetime
 import mimetypes
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 
-from google.cloud import storage
-from google.cloud.exceptions import NotFound, Conflict
-from google.auth import default
 from dotenv import load_dotenv
+from google.auth import default
+from google.cloud import storage
+from google.cloud.exceptions import Conflict
+from google.cloud.exceptions import NotFound
 import typer
 from typing_extensions import Annotated
 

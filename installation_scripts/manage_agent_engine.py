@@ -7,33 +7,31 @@ listing, testing, and deleting deployed agent engines.
 """
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 import os
-import sys
-from datetime import datetime
 from pathlib import Path
+import sys
 from typing import Dict, List, Optional
 
-import typer
-import vertexai
 from dotenv import load_dotenv
 from google.api_core import client_options
 from google.cloud import aiplatform
-from google.cloud.aiplatform_v1beta1 import (
-    DeleteReasoningEngineRequest,
-    ReasoningEngineServiceClient,
-)
+from google.cloud.aiplatform_v1beta1 import DeleteReasoningEngineRequest
+from google.cloud.aiplatform_v1beta1 import ReasoningEngineServiceClient
+import typer
 from typing_extensions import Annotated
+import vertexai
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
 
 # Import SOC Agent package
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from soc_agent import create_agent
-
 # Additional imports for deployment
 import shutil
+
+from soc_agent import create_agent
 
 app = typer.Typer(
     add_completion=False,
