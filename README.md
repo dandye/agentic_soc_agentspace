@@ -193,13 +193,18 @@ Set these variables in your `.env` file before deployment:
 - `GCP_PROJECT_NUMBER` - Your Google Cloud Project Number (numeric ID)
 - `GCP_LOCATION` - Deployment region (e.g., us-central1)
 - `GCP_STAGING_BUCKET` - GCS bucket name with gs:// prefix (e.g., gs://my-bucket)
-- `GCP_VERTEXAI_ENABLED` - Set to "True" to enable Vertex AI features
 
 **Required Security Tools:**
-- Chronicle SIEM: `CHRONICLE_CUSTOMER_ID`, `CHRONICLE_REGION`, `CHRONICLE_SERVICE_ACCOUNT_PATH`
+- Chronicle SIEM: `CHRONICLE_PROJECT_ID`, `CHRONICLE_CUSTOMER_ID`, `CHRONICLE_SERVICE_ACCOUNT_PATH`
 - SOAR: `SOAR_URL`, `SOAR_API_KEY`
 - Threat Intelligence: `GTI_API_KEY` (Google Threat Intelligence/VirusTotal)
 - RAG Corpus: `RAG_CORPUS_ID` (full resource name)
+
+**Optional Variables (have sensible defaults):**
+- `CHRONICLE_REGION` - Chronicle region (default: "us")
+- `DEBUG` - Enable debug logging (default: False)
+- `RAG_SIMILARITY_TOP_K` - RAG retrieval top-k results (default: 10)
+- `RAG_DISTANCE_THRESHOLD` - RAG vector distance threshold (default: 0.6)
 
 ### Stage 2: Deployment Outputs
 Run `make agent-engine-deploy` and save the generated `AGENT_ENGINE_RESOURCE_NAME` from the output to your `.env`.
