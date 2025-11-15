@@ -17,6 +17,8 @@ Deploy security-focused AI agents to Google Cloud with integrated access to Chro
 - [Python CLI (Alternative Interface)](#python-cli-alternative-interface)
 - [Project Structure](#project-structure)
 - [Development](#development)
+  - [Local Development with ADK Web](#local-development-with-adk-web)
+  - [Testing Individual MCP Servers](#testing-individual-mcp-servers)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
 - [Best Practices](#best-practices)
@@ -24,6 +26,8 @@ Deploy security-focused AI agents to Google Cloud with integrated access to Chro
 - [Support](#support)
 
 ## Quick Start
+
+### Option 1: Local Development (Recommended for Getting Started)
 
 ```bash
 # Clone and setup
@@ -37,9 +41,23 @@ cp .env.example .env
 # Install dependencies in a virtual env
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt  # requirements.in -> requirements.txt via pip-compile
+pip install -r requirements.txt
 
-# Deploy agent
+# Run locally with ADK Web (instant, no deployment needed!)
+cd soc_agent
+GOOGLE_GENAI_USE_VERTEXAI=True \
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account.json \
+GOOGLE_CLOUD_PROJECT=your-project-id \
+GOOGLE_CLOUD_LOCATION=us-central1 \
+adk web
+```
+
+This opens an interactive web UI at `http://localhost:8000` where you can test all features instantly. See [Local Development with ADK Web](#local-development-with-adk-web) for details.
+
+### Option 2: Production Deployment to Agent Engine
+
+```bash
+# After completing the setup above, deploy to Agent Engine
 make agent-engine-deploy
 ```
 
@@ -460,7 +478,55 @@ tools = [secops_tool, soar_tool]  # Choose tools as needed
 2. Update `extra_packages` with server path
 3. Modify installation script if needed
 
-### Local Testing
+### Local Development with ADK Web
+
+The fastest way to develop and test your agent locally is using `adk web`, which provides an interactive web UI without deploying to Agent Engine.
+
+#### Running ADK Web
+
+From the `soc_agent` directory, run:
+
+```bash
+cd soc_agent
+
+GOOGLE_GENAI_USE_VERTEXAI=True \
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account.json \
+GOOGLE_CLOUD_PROJECT=your-project-id \
+GOOGLE_CLOUD_LOCATION=us-central1 \
+adk web
+```
+
+Replace the values:
+- `/path/to/your/service-account.json` - Path to your Chronicle service account JSON file (same as `CHRONICLE_SERVICE_ACCOUNT_PATH` in .env)
+- `your-project-id` - Your GCP project ID (same as `GCP_PROJECT_ID` in .env)
+- `us-central1` - Your GCP location (same as `GCP_LOCATION` in .env)
+
+The web UI will open at `http://localhost:8000` where you can:
+- Chat with your agent in real-time
+- Test MCP tool integrations (Chronicle, SOAR, GTI, SCC)
+- Query the RAG corpus for runbooks and procedures
+- See tool calls and responses as they happen
+- Iterate on your agent configuration without redeployment
+
+#### Why Use ADK Web?
+
+**Benefits:**
+- **Instant feedback**: No 10-15 minute deployment wait time
+- **Cost effective**: No Agent Engine hosting costs during development
+- **Full feature parity**: All MCP tools and RAG retrieval work locally
+- **Easy debugging**: See tool calls and responses in real-time
+- **Rapid iteration**: Modify agent.py and restart immediately
+
+**When to use Agent Engine instead:**
+- Production deployments
+- Integration with AgentSpace
+- Multi-user access
+- Persistent conversation history
+- Autoscaling requirements
+
+### Testing Individual MCP Servers
+
+You can also test MCP servers in isolation:
 
 ```bash
 # Test MCP servers locally
