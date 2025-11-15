@@ -47,7 +47,9 @@ def create_agent():
 
     # Initialize Vertex AI for the agent to work with Gemini models and RAG
     if GCP_PROJECT_ID and GCP_VERTEXAI_ENABLED == "True":
-        logger.info(f"Initializing Vertex AI with project: {GCP_PROJECT_ID}, location: {GCP_LOCATION}")
+        logger.info(
+            f"Initializing Vertex AI with project: {GCP_PROJECT_ID}, location: {GCP_LOCATION}"
+        )
         vertexai.init(
             project=GCP_PROJECT_ID,
             location=GCP_LOCATION,
@@ -75,12 +77,12 @@ def create_agent():
     # Debug mode
     DEBUG = os.environ.get("DEBUG", "False") == "True"
     if DEBUG:
-        os.environ['GRPC_VERBOSITY'] = 'DEBUG'
-        os.environ['GRPC_TRACE'] = 'all'
+        os.environ["GRPC_VERBOSITY"] = "DEBUG"
+        os.environ["GRPC_TRACE"] = "all"
         logging.basicConfig(level=logging.DEBUG)
-        logging.getLogger('google').setLevel(logging.DEBUG)
-        logging.getLogger('google.auth').setLevel(logging.DEBUG)
-        logging.getLogger('google.api_core').setLevel(logging.DEBUG)
+        logging.getLogger("google").setLevel(logging.DEBUG)
+        logging.getLogger("google.auth").setLevel(logging.DEBUG)
+        logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
     # Get service account filename for MCP servers
     service_account_path = Path(CHRONICLE_SERVICE_ACCOUNT_PATH)
@@ -96,23 +98,23 @@ def create_agent():
     secops_siem_tools = McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command='uv',
+                command="uv",
                 args=[
                     "--directory",
                     "./mcp-security/server/secops/secops_mcp",
                     "run",
-                    "server.py"
+                    "server.py",
                 ],
                 env={
                     "CHRONICLE_PROJECT_ID": CHRONICLE_PROJECT_ID,
                     "CHRONICLE_CUSTOMER_ID": CHRONICLE_CUSTOMER_ID,
                     "CHRONICLE_REGION": CHRONICLE_REGION,
-                    "SECOPS_SA_PATH": service_account_filename
-                }
+                    "SECOPS_SA_PATH": service_account_filename,
+                },
             ),
-            timeout=60000
+            timeout=60000,
         ),
-        errlog=None
+        errlog=None,
     )
     tools.append(secops_siem_tools)
 
@@ -123,21 +125,21 @@ def create_agent():
     secops_soar_tools = McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command='uv',
+                command="uv",
                 args=[
                     "--directory",
                     "./mcp-security/server/secops-soar/secops_soar_mcp",
                     "run",
-                    "server.py"
+                    "server.py",
                 ],
                 env={
                     "SOAR_URL": SOAR_URL,
-                    "SOAR_APP_KEY": SOAR_API_KEY  # MCP server expects SOAR_APP_KEY
-                }
+                    "SOAR_APP_KEY": SOAR_API_KEY,  # MCP server expects SOAR_APP_KEY
+                },
             ),
-            timeout=60000
+            timeout=60000,
         ),
-        errlog=None
+        errlog=None,
     )
     tools.append(secops_soar_tools)
 
@@ -148,20 +150,18 @@ def create_agent():
     gti_tools = McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command='uv',
+                command="uv",
                 args=[
                     "--directory",
                     "./mcp-security/server/gti/gti_mcp",
                     "run",
-                    "server.py"
+                    "server.py",
                 ],
-                env={
-                    "VT_APIKEY": GTI_API_KEY  # MCP server expects VT_APIKEY
-                }
+                env={"VT_APIKEY": GTI_API_KEY},  # MCP server expects VT_APIKEY
             ),
-            timeout=60000
+            timeout=60000,
         ),
-        errlog=None
+        errlog=None,
     )
     tools.append(gti_tools)
 
@@ -172,18 +172,13 @@ def create_agent():
     scc_tools = McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command='uv',
-                args=[
-                    "--directory",
-                    "./mcp-security/server/scc",
-                    "run",
-                    "scc_mcp.py"
-                ],
-                env={}
+                command="uv",
+                args=["--directory", "./mcp-security/server/scc", "run", "scc_mcp.py"],
+                env={},
             ),
-            timeout=60000
+            timeout=60000,
         ),
-        errlog=None
+        errlog=None,
     )
     tools.append(scc_tools)
 
@@ -193,13 +188,11 @@ def create_agent():
     if RAG_CORPUS_ID:
         logger.info(f"Configuring RAG retrieval with corpus: {RAG_CORPUS_ID}")
         ask_vertex_retrieval = VertexAiRagRetrieval(
-            name='retrieve_agentic_soc_runbooks',
+            name="retrieve_agentic_soc_runbooks",
             description=(
                 "Use this tool to retrieve IRPs, Runbooks, Common Steps, and Personas for the Agentic SOC."
             ),
-            rag_resources=[
-                rag.RagResource(rag_corpus=RAG_CORPUS_ID)
-            ],
+            rag_resources=[rag.RagResource(rag_corpus=RAG_CORPUS_ID)],
             similarity_top_k=RAG_SIMILARITY_TOP_K,
             vector_distance_threshold=RAG_DISTANCE_THRESHOLD,
         )
@@ -261,6 +254,6 @@ except Exception as e:
 
 # Export key functions and the root agent
 __all__ = [
-    'create_agent',
-    'root_agent',
+    "create_agent",
+    "root_agent",
 ]

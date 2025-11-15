@@ -10,11 +10,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from dotenv import load_dotenv
 import google.auth
 from google.auth.transport import requests as google_requests
 import requests
 import typer
-from dotenv import load_dotenv
 from typing_extensions import Annotated
 
 app = typer.Typer(
@@ -68,14 +68,14 @@ class AgentSpaceManager:
 
         lines = []
         if self.env_file.exists():
-            with open(self.env_file, 'r') as f:
+            with open(self.env_file, "r") as f:
                 lines = f.readlines()
 
         # Find existing key or add new one
         key_found = False
         for i, line in enumerate(lines):
-            if line.strip() and not line.strip().startswith('#') and '=' in line:
-                existing_key = line.split('=', 1)[0].strip()
+            if line.strip() and not line.strip().startswith("#") and "=" in line:
+                existing_key = line.split("=", 1)[0].strip()
                 if existing_key == key:
                     lines[i] = f"{key}={value}\n"
                     key_found = True
@@ -84,7 +84,7 @@ class AgentSpaceManager:
         if not key_found:
             lines.append(f"{key}={value}\n")
 
-        with open(self.env_file, 'w') as f:
+        with open(self.env_file, "w") as f:
             f.writelines(lines)
 
         # Update in-memory env_vars
@@ -162,7 +162,8 @@ class AgentSpaceManager:
             "adk_agent_definition": {
                 "tool_settings": {
                     "tool_description": self.env_vars.get(
-                        "AGENT_TOOL_DESCRIPTION", "Various Tools from SIEM, SOAR and SCC"
+                        "AGENT_TOOL_DESCRIPTION",
+                        "Various Tools from SIEM, SOAR and SCC",
                     )
                 },
                 "provisioned_reasoning_engine": {
@@ -267,7 +268,9 @@ class AgentSpaceManager:
         api_url = self._get_agent_api_url(agent_id)
         response = self._make_request("GET", api_url)
         if response and response.status_code == 200:
-            typer.secho(" AgentSpace agent verified successfully!", fg=typer.colors.GREEN)
+            typer.secho(
+                " AgentSpace agent verified successfully!", fg=typer.colors.GREEN
+            )
             return True
         return False
 
@@ -325,6 +328,7 @@ class AgentSpaceManager:
 
         # Generate app ID with timestamp
         import time
+
         if not app_name:
             app_name = "agentic-soc-app"
         app_id = f"{app_name.lower().replace(' ', '-')}_{int(time.time())}"
@@ -359,7 +363,9 @@ class AgentSpaceManager:
         if enable_chat and solution_type == "SOLUTION_TYPE_CHAT":
             app_config["chatEngineConfig"] = {
                 "agentCreationConfig": {
-                    "business": self.env_vars.get("AGENT_BUSINESS", "Security Operations"),
+                    "business": self.env_vars.get(
+                        "AGENT_BUSINESS", "Security Operations"
+                    ),
                     "defaultLanguageCode": self.env_vars.get("AGENT_LANGUAGE", "en"),
                     "timeZone": self.env_vars.get("AGENT_TIMEZONE", "America/New_York"),
                 }
@@ -370,10 +376,7 @@ class AgentSpaceManager:
         typer.echo(f"  Solution type: {solution_type}")
 
         response = self._make_request(
-            "POST",
-            url,
-            json=app_config,
-            params={"engineId": app_id}
+            "POST", url, json=app_config, params={"engineId": app_id}
         )
 
         if response and response.status_code in [200, 201]:
@@ -392,7 +395,7 @@ class AgentSpaceManager:
             return True
         else:
             typer.secho(" Failed to create app", fg=typer.colors.RED)
-            if response and hasattr(response, 'text'):
+            if response and hasattr(response, "text"):
                 typer.echo(f"  Response: {response.text}")
             return False
 
@@ -401,7 +404,9 @@ class AgentSpaceManager:
         project_id = self.env_vars.get("GCP_PROJECT_ID")
         app_id = self.env_vars.get("AGENTSPACE_APP_ID")
         if not all([project_id, app_id]):
-            typer.secho(" Cannot generate URL - missing configuration.", fg=typer.colors.RED)
+            typer.secho(
+                " Cannot generate URL - missing configuration.", fg=typer.colors.RED
+            )
             return
 
         url = f"https://console.cloud.google.com/gen-ai-studio/agentspace/apps/{app_id}?project={project_id}"
@@ -435,7 +440,9 @@ class AgentSpaceManager:
         typer.echo(f"  Data stores: {data_store_ids}")
 
         if data_store_ids:
-            typer.echo(f"  Engine has {len(data_store_ids)} data store(s) configured: {', '.join(data_store_ids)}")
+            typer.echo(
+                f"  Engine has {len(data_store_ids)} data store(s) configured: {', '.join(data_store_ids)}"
+            )
 
             # Verify each data store exists
             for ds_id in data_store_ids:
@@ -452,10 +459,15 @@ class AgentSpaceManager:
 
             # If we have at least one data store, we can use it for search
             # Engines with a single data store cannot add or remove data stores
-            typer.secho("  Using existing data store(s) for search", fg=typer.colors.GREEN)
+            typer.secho(
+                "  Using existing data store(s) for search", fg=typer.colors.GREEN
+            )
             return True
 
-        typer.secho(" No data stores found. Creating unstructured data store...", fg=typer.colors.YELLOW)
+        typer.secho(
+            " No data stores found. Creating unstructured data store...",
+            fg=typer.colors.YELLOW,
+        )
         return self._create_website_datastore()
 
     def _create_website_datastore(self) -> bool:
@@ -475,7 +487,7 @@ class AgentSpaceManager:
             "displayName": "Unstructured Data Store for SOC Agent",
             "industryVertical": "GENERIC",
             "solutionTypes": ["SOLUTION_TYPE_SEARCH"],
-            "contentConfig": "CONTENT_REQUIRED"
+            "contentConfig": "CONTENT_REQUIRED",
         }
 
         # Create the data store
@@ -483,12 +495,14 @@ class AgentSpaceManager:
             "POST",
             data_store_url,
             json=data_store_config,
-            params={"dataStoreId": data_store_id}
+            params={"dataStoreId": data_store_id},
         )
 
         if not create_response:
             # Check if it already exists (409 error)
-            typer.echo(f"  Data store may already exist, attempting to link: {data_store_id}")
+            typer.echo(
+                f"  Data store may already exist, attempting to link: {data_store_id}"
+            )
         else:
             typer.echo(f"  Created data store: {data_store_id}")
 
@@ -510,18 +524,19 @@ class AgentSpaceManager:
         all_data_stores = list(set(existing_ids + [data_store_id]))
 
         # Update engine with new data store list using PATCH
-        update_config = {
-            "dataStoreIds": all_data_stores
-        }
+        update_config = {"dataStoreIds": all_data_stores}
 
         patch_response = self._make_request(
             "PATCH",
             engine_url,
             json=update_config,
-            params={"updateMask": "dataStoreIds"}
+            params={"updateMask": "dataStoreIds"},
         )
         if patch_response:
-            typer.secho(" Unstructured data store created and linked successfully!", fg=typer.colors.GREEN)
+            typer.secho(
+                " Unstructured data store created and linked successfully!",
+                fg=typer.colors.GREEN,
+            )
             return True
         else:
             typer.secho(" Failed to link data store to engine", fg=typer.colors.RED)
@@ -560,12 +575,12 @@ class AgentSpaceManager:
         if not description:
             description = self.env_vars.get(
                 "AGENT_DESCRIPTION",
-                "AI-powered security operations agent with Google Security tools integration"
+                "AI-powered security operations agent with Google Security tools integration",
             )
         if not tool_description:
             tool_description = self.env_vars.get(
                 "AGENT_TOOL_DESCRIPTION",
-                "Security operations agent for threat analysis and incident response"
+                "Security operations agent for threat analysis and incident response",
             )
         if not auth_id:
             auth_id = self.env_vars.get("OAUTH_AUTH_ID")
@@ -581,7 +596,6 @@ class AgentSpaceManager:
 
         url = f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/locations/global/collections/default_collection/engines/{as_app}/assistants/default_assistant/agents"
 
-
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -592,13 +606,9 @@ class AgentSpaceManager:
             "displayName": display_name,
             "description": description,
             "adk_agent_definition": {
-                "tool_settings": {
-                    "tool_description": tool_description
-                },
-                "provisioned_reasoning_engine": {
-                    "reasoning_engine": reasoning_engine
-                }
-            }
+                "tool_settings": {"tool_description": tool_description},
+                "provisioned_reasoning_engine": {"reasoning_engine": reasoning_engine},
+            },
         }
 
         # Add authorization if provided
@@ -627,7 +637,7 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error linking agent to AgentSpace: {e}", err=True)
-            if hasattr(e.response, 'text'):
+            if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
@@ -696,7 +706,9 @@ class AgentSpaceManager:
             response = requests.delete(url, headers=headers)
             response.raise_for_status()
 
-            typer.secho(" Agent unlinked successfully from AgentSpace!", fg=typer.colors.GREEN)
+            typer.secho(
+                " Agent unlinked successfully from AgentSpace!", fg=typer.colors.GREEN
+            )
             typer.echo(f"  Agent ID {agent_id} removed from app {as_app}")
             typer.echo("  Note: The AgentSpace app remains intact")
 
@@ -709,7 +721,7 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error unlinking agent from AgentSpace: {e}", err=True)
-            if hasattr(e.response, 'text'):
+            if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
@@ -735,7 +747,9 @@ class AgentSpaceManager:
         if not agent_id:
             agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
             if not agent_id:
-                typer.echo("Error: No agent ID provided or found in environment", err=True)
+                typer.echo(
+                    "Error: No agent ID provided or found in environment", err=True
+                )
                 return False
 
         project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
@@ -796,7 +810,7 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error updating agent configuration: {e}", err=True)
-            if hasattr(e.response, 'text'):
+            if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
@@ -864,7 +878,7 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error listing apps: {e}", err=True)
-            if hasattr(e.response, 'text'):
+            if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
@@ -935,12 +949,16 @@ class AgentSpaceManager:
                 adk_def = agent.get("adk_agent_definition", {})
                 tool_settings = adk_def.get("tool_settings", {})
                 if tool_settings.get("tool_description"):
-                    typer.echo(f"   Tool Description: {tool_settings['tool_description']}")
+                    typer.echo(
+                        f"   Tool Description: {tool_settings['tool_description']}"
+                    )
 
                 # Show reasoning engine if available
                 prov_engine = adk_def.get("provisioned_reasoning_engine", {})
                 if prov_engine.get("reasoning_engine"):
-                    typer.echo(f"   Reasoning Engine: {prov_engine['reasoning_engine']}")
+                    typer.echo(
+                        f"   Reasoning Engine: {prov_engine['reasoning_engine']}"
+                    )
 
                 typer.echo()
 
@@ -948,7 +966,7 @@ class AgentSpaceManager:
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error listing agents: {e}", err=True)
-            if hasattr(e.response, 'text'):
+            if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
@@ -1018,7 +1036,9 @@ class AgentSpaceManager:
 
                     typer.echo(f"    {i}. Title: {title}")
                     typer.echo(f"       Relevance: {relevance}")
-                    typer.echo(f"       Snippet: {snippet[:100]}{'...' if len(snippet) > 100 else ''}")
+                    typer.echo(
+                        f"       Snippet: {snippet[:100]}{'...' if len(snippet) > 100 else ''}"
+                    )
                     typer.echo("")
             else:
                 typer.echo("  No search results returned")
@@ -1124,13 +1144,17 @@ def ensure_datastore(
 @app.command()
 def link_agent(
     display_name: Annotated[
-        Optional[str], typer.Option("--display-name", help="Display name for the agent.")
+        Optional[str],
+        typer.Option("--display-name", help="Display name for the agent."),
     ] = None,
     description: Annotated[
         Optional[str], typer.Option("--description", help="Description of the agent.")
     ] = None,
     tool_description: Annotated[
-        Optional[str], typer.Option("--tool-description", help="Description of what the agent tool does.")
+        Optional[str],
+        typer.Option(
+            "--tool-description", help="Description of what the agent tool does."
+        ),
     ] = None,
     auth_id: Annotated[
         Optional[str], typer.Option("--auth-id", help="OAuth authorization ID.")
@@ -1141,14 +1165,19 @@ def link_agent(
 ) -> None:
     """Link an existing agent engine to AgentSpace with OAuth authorization."""
     manager = AgentSpaceManager(env_file)
-    if not manager.link_agent_to_agentspace(display_name, description, tool_description, auth_id):
+    if not manager.link_agent_to_agentspace(
+        display_name, description, tool_description, auth_id
+    ):
         raise typer.Exit(code=1)
 
 
 @app.command()
 def unlink_agent(
     agent_id: Annotated[
-        Optional[str], typer.Option("--agent-id", help="ID of the agent to unlink (defaults to env var).")
+        Optional[str],
+        typer.Option(
+            "--agent-id", help="ID of the agent to unlink (defaults to env var)."
+        ),
     ] = None,
     force: Annotated[
         bool, typer.Option("--force", help="Force unlinking without confirmation.")
@@ -1169,13 +1198,18 @@ def update_agent_config(
         Optional[str], typer.Option("--agent-id", help="ID of the agent to update.")
     ] = None,
     display_name: Annotated[
-        Optional[str], typer.Option("--display-name", help="New display name for the agent.")
+        Optional[str],
+        typer.Option("--display-name", help="New display name for the agent."),
     ] = None,
     description: Annotated[
-        Optional[str], typer.Option("--description", help="New description of the agent.")
+        Optional[str],
+        typer.Option("--description", help="New description of the agent."),
     ] = None,
     tool_description: Annotated[
-        Optional[str], typer.Option("--tool-description", help="New description of what the agent tool does.")
+        Optional[str],
+        typer.Option(
+            "--tool-description", help="New description of what the agent tool does."
+        ),
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -1183,7 +1217,9 @@ def update_agent_config(
 ) -> None:
     """Update an existing agent's configuration in AgentSpace."""
     manager = AgentSpaceManager(env_file)
-    if not manager.update_agent_config(agent_id, display_name, description, tool_description):
+    if not manager.update_agent_config(
+        agent_id, display_name, description, tool_description
+    ):
         raise typer.Exit(code=1)
 
 
@@ -1217,13 +1253,21 @@ def create_app(
         Optional[str], typer.Option("--name", help="Display name for the app.")
     ] = None,
     solution_type: Annotated[
-        str, typer.Option("--type", help="Solution type (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT).")
+        str,
+        typer.Option(
+            "--type", help="Solution type (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT)."
+        ),
     ] = "SOLUTION_TYPE_SEARCH",
     data_store_id: Annotated[
-        Optional[str], typer.Option("--data-store", help="Data store ID to associate with the app.")
+        Optional[str],
+        typer.Option("--data-store", help="Data store ID to associate with the app."),
     ] = None,
     enable_chat: Annotated[
-        bool, typer.Option("--enable-chat", help="Enable chat features (requires Dialogflow API for CHAT type).")
+        bool,
+        typer.Option(
+            "--enable-chat",
+            help="Enable chat features (requires Dialogflow API for CHAT type).",
+        ),
     ] = False,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -1239,7 +1283,7 @@ def create_app(
         app_name=app_name,
         solution_type=solution_type,
         data_store_ids=data_store_ids,
-        enable_chat=enable_chat
+        enable_chat=enable_chat,
     ):
         raise typer.Exit(code=1)
 

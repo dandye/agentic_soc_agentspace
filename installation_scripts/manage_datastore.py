@@ -10,11 +10,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from dotenv import load_dotenv
 import google.auth
 from google.auth.transport import requests as google_requests
 import requests
 import typer
-from dotenv import load_dotenv
 from typing_extensions import Annotated
 
 app = typer.Typer(
@@ -113,7 +113,10 @@ class DataStoreManager:
         # Generate data store ID if not provided
         if not data_store_id:
             import time
-            data_store_id = f"{display_name.lower().replace(' ', '-')}_{int(time.time())}"
+
+            data_store_id = (
+                f"{display_name.lower().replace(' ', '-')}_{int(time.time())}"
+            )
 
         url = (
             f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
@@ -286,22 +289,38 @@ class DataStoreManager:
 
 @app.command()
 def create(
-    name: Annotated[str, typer.Option("--name", "-n", help="Display name for the data store")] = "datastore",
-    data_store_id: Annotated[Optional[str], typer.Option("--id", "-i", help="ID for the data store")] = None,
-    solution_type: Annotated[str, typer.Option("--type", "-t", help="Solution type")] = "SOLUTION_TYPE_SEARCH",
-    content_config: Annotated[str, typer.Option("--content", "-c", help="Content configuration")] = "CONTENT_REQUIRED",
-    industry: Annotated[str, typer.Option("--industry", help="Industry vertical")] = "GENERIC",
-    env_file: Annotated[Path, typer.Option(help="Path to the environment file.")] = Path(".env"),
+    name: Annotated[
+        str, typer.Option("--name", "-n", help="Display name for the data store")
+    ] = "datastore",
+    data_store_id: Annotated[
+        Optional[str], typer.Option("--id", "-i", help="ID for the data store")
+    ] = None,
+    solution_type: Annotated[
+        str, typer.Option("--type", "-t", help="Solution type")
+    ] = "SOLUTION_TYPE_SEARCH",
+    content_config: Annotated[
+        str, typer.Option("--content", "-c", help="Content configuration")
+    ] = "CONTENT_REQUIRED",
+    industry: Annotated[
+        str, typer.Option("--industry", help="Industry vertical")
+    ] = "GENERIC",
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
 ) -> None:
     """Create a new data store."""
     manager = DataStoreManager(env_file)
-    if not manager.create_data_store(name, data_store_id, solution_type, content_config, industry):
+    if not manager.create_data_store(
+        name, data_store_id, solution_type, content_config, industry
+    ):
         raise typer.Exit(code=1)
 
 
 @app.command()
 def list(
-    env_file: Annotated[Path, typer.Option(help="Path to the environment file.")] = Path(".env"),
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
 ) -> None:
     """List all data stores in the project."""
     manager = DataStoreManager(env_file)
@@ -312,7 +331,9 @@ def list(
 @app.command()
 def info(
     data_store_id: Annotated[str, typer.Argument(help="ID of the data store")],
-    env_file: Annotated[Path, typer.Option(help="Path to the environment file.")] = Path(".env"),
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
 ) -> None:
     """Get information about a specific data store."""
     manager = DataStoreManager(env_file)
@@ -322,9 +343,15 @@ def info(
 
 @app.command()
 def delete(
-    data_store_id: Annotated[str, typer.Argument(help="ID of the data store to delete")],
-    force: Annotated[bool, typer.Option("--force", "-f", help="Skip confirmation prompt")] = False,
-    env_file: Annotated[Path, typer.Option(help="Path to the environment file.")] = Path(".env"),
+    data_store_id: Annotated[
+        str, typer.Argument(help="ID of the data store to delete")
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="Skip confirmation prompt")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
 ) -> None:
     """Delete a data store."""
     manager = DataStoreManager(env_file)

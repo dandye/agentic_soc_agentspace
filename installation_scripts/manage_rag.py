@@ -8,16 +8,17 @@ and deleting RAG corpora in Vertex AI.
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 
-from google.auth import default
-from google.api_core.exceptions import NotFound, ResourceExhausted
-from google.cloud import storage
-import vertexai
-from vertexai.preview import rag
 from dotenv import load_dotenv
+from google.api_core.exceptions import NotFound
+from google.api_core.exceptions import ResourceExhausted
+from google.auth import default
+from google.cloud import storage
 import typer
 from typing_extensions import Annotated
+import vertexai
+from vertexai.preview import rag
 
 app = typer.Typer(
     add_completion=False,
@@ -52,7 +53,9 @@ class RAGManager:
         """Initialize Vertex AI with project and location from environment."""
         self.project_id = self.env_vars.get("GCP_PROJECT_ID")
         # Use RAG-specific location if set, otherwise fall back to GCP_LOCATION
-        self.location = self.env_vars.get("RAG_GCP_LOCATION") or self.env_vars.get("GCP_LOCATION")
+        self.location = self.env_vars.get("RAG_GCP_LOCATION") or self.env_vars.get(
+            "GCP_LOCATION"
+        )
 
         if not self.project_id:
             typer.secho(
@@ -127,14 +130,20 @@ class RAGManager:
 
             if verbose:
                 typer.echo()
-                typer.echo("Note: Use 'rag-info <corpus_name>' to see files in a specific corpus")
+                typer.echo(
+                    "Note: Use 'rag-info <corpus_name>' to see files in a specific corpus"
+                )
 
             return True
 
         except ResourceExhausted:
-            typer.secho("Error: Quota exceeded for Vertex AI RAG service", fg=typer.colors.RED)
+            typer.secho(
+                "Error: Quota exceeded for Vertex AI RAG service", fg=typer.colors.RED
+            )
             typer.echo("You have exceeded the API rate limit for RAG operations.")
-            typer.echo("Please wait a minute and try again, or request a quota increase.")
+            typer.echo(
+                "Please wait a minute and try again, or request a quota increase."
+            )
             return False
         except Exception as e:
             typer.secho(f"Error listing RAG corpora: {e}", fg=typer.colors.RED)
@@ -195,7 +204,10 @@ class RAGManager:
                 else:
                     typer.echo("No files found in corpus.")
             except Exception as e:
-                typer.secho(f"Note: Unable to list files: {str(e)[:100]}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"Note: Unable to list files: {str(e)[:100]}",
+                    fg=typer.colors.YELLOW,
+                )
 
             return True
 
@@ -203,9 +215,7 @@ class RAGManager:
             typer.secho(f"Corpus not found: {corpus_name}", fg=typer.colors.RED)
             return False
         except Exception as e:
-            typer.secho(
-                f"Error getting corpus information: {e}", fg=typer.colors.RED
-            )
+            typer.secho(f"Error getting corpus information: {e}", fg=typer.colors.RED)
             return False
 
     def create_corpus(
@@ -285,7 +295,7 @@ class RAGManager:
         gcs_paths: list,
         chunk_size: int = 512,
         chunk_overlap: int = 50,
-        timeout: int = 600
+        timeout: int = 600,
     ) -> bool:
         """
         Import files from Google Cloud Storage into a RAG corpus.
@@ -317,12 +327,14 @@ class RAGManager:
             total_imported = 0
 
             if total_files > BATCH_SIZE:
-                typer.echo(f"Note: Splitting into batches of {BATCH_SIZE} files (API limit)")
+                typer.echo(
+                    f"Note: Splitting into batches of {BATCH_SIZE} files (API limit)"
+                )
                 typer.echo()
 
             # Process in batches
             for batch_num, i in enumerate(range(0, total_files, BATCH_SIZE), 1):
-                batch_paths = gcs_paths[i:i + BATCH_SIZE]
+                batch_paths = gcs_paths[i : i + BATCH_SIZE]
                 batch_count = len(batch_paths)
 
                 if total_files > BATCH_SIZE:
@@ -339,11 +351,11 @@ class RAGManager:
                     paths=batch_paths,
                     chunk_size=chunk_size,
                     chunk_overlap=chunk_overlap,
-                    timeout=timeout
+                    timeout=timeout,
                 )
 
                 # Show import results
-                if hasattr(response, 'imported_rag_files_count'):
+                if hasattr(response, "imported_rag_files_count"):
                     imported = response.imported_rag_files_count
                     total_imported += imported
                     typer.secho(
@@ -395,9 +407,7 @@ class RAGManager:
                 typer.echo(f"  Display Name: {display_name}")
                 typer.echo(f"  Resource Name: {corpus_name}")
 
-                if not typer.confirm(
-                    "\nAre you sure you want to delete this corpus?"
-                ):
+                if not typer.confirm("\nAre you sure you want to delete this corpus?"):
                     typer.echo("Cancelled.")
                     return False
 
@@ -435,7 +445,9 @@ def list(
 
 @app.command()
 def info(
-    corpus_name: Annotated[str, typer.Argument(help="Full resource name of the corpus.")],
+    corpus_name: Annotated[
+        str, typer.Argument(help="Full resource name of the corpus.")
+    ],
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
     ] = Path(".env"),
@@ -450,7 +462,8 @@ def info(
 def create(
     display_name: Annotated[str, typer.Argument(help="Display name for the corpus.")],
     description: Annotated[
-        Optional[str], typer.Option("--description", "-d", help="Description of the corpus.")
+        Optional[str],
+        typer.Option("--description", "-d", help="Description of the corpus."),
     ] = None,
     embedding_model: Annotated[
         str,
@@ -472,7 +485,9 @@ def create(
 
 @app.command()
 def delete(
-    corpus_name: Annotated[str, typer.Argument(help="Full resource name of the corpus to delete.")],
+    corpus_name: Annotated[
+        str, typer.Argument(help="Full resource name of the corpus to delete.")
+    ],
     force: Annotated[
         bool, typer.Option("--force", "-f", help="Skip confirmation prompt.")
     ] = False,
@@ -488,16 +503,28 @@ def delete(
 
 @app.command()
 def import_files(
-    corpus_name: Annotated[Optional[str], typer.Argument(help="Full resource name of the corpus (or set RAG_CORPUS_ID in .env).")] = None,
-    gcs_paths: Annotated[Optional[List[str]], typer.Argument(help="GCS paths (gs://...) to import, or omit to import all from GCS_DEFAULT_BUCKET.")] = None,
+    corpus_name: Annotated[
+        Optional[str],
+        typer.Argument(
+            help="Full resource name of the corpus (or set RAG_CORPUS_ID in .env)."
+        ),
+    ] = None,
+    gcs_paths: Annotated[
+        Optional[List[str]],
+        typer.Argument(
+            help="GCS paths (gs://...) to import, or omit to import all from GCS_DEFAULT_BUCKET."
+        ),
+    ] = None,
     chunk_size: Annotated[
-        int, typer.Option("--chunk-size", "-s", help="Size of text chunks for indexing.")
+        int,
+        typer.Option("--chunk-size", "-s", help="Size of text chunks for indexing."),
     ] = 512,
     chunk_overlap: Annotated[
         int, typer.Option("--chunk-overlap", "-o", help="Overlap between chunks.")
     ] = 50,
     timeout: Annotated[
-        int, typer.Option("--timeout", "-t", help="Timeout in seconds for the operation.")
+        int,
+        typer.Option("--timeout", "-t", help="Timeout in seconds for the operation."),
     ] = 600,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -511,7 +538,7 @@ def import_files(
     if not corpus:
         typer.secho(
             "Error: Corpus name required. Provide as argument or set RAG_CORPUS_ID in .env",
-            fg=typer.colors.RED
+            fg=typer.colors.RED,
         )
         raise typer.Exit(code=1)
 
@@ -524,17 +551,18 @@ def import_files(
         if not default_bucket:
             typer.secho(
                 "Error: No GCS paths provided and GCS_DEFAULT_BUCKET not set in .env",
-                fg=typer.colors.RED
+                fg=typer.colors.RED,
             )
-            typer.echo("Either provide GCS paths or set GCS_DEFAULT_BUCKET in your .env file")
+            typer.echo(
+                "Either provide GCS paths or set GCS_DEFAULT_BUCKET in your .env file"
+            )
             raise typer.Exit(code=1)
 
         try:
             # Initialize storage client to list bucket contents
             credentials, _ = default()
             storage_client = storage.Client(
-                project=manager.project_id,
-                credentials=credentials
+                project=manager.project_id, credentials=credentials
             )
 
             typer.echo(f"Discovering files in bucket: {default_bucket}")
@@ -547,7 +575,10 @@ def import_files(
                 paths_to_import.append(uri)
 
             if not paths_to_import:
-                typer.secho(f"No files found in bucket: {default_bucket}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"No files found in bucket: {default_bucket}",
+                    fg=typer.colors.YELLOW,
+                )
                 return
 
             typer.echo(f"Found {len(paths_to_import)} file(s) to import:")
@@ -559,7 +590,9 @@ def import_files(
             typer.secho(f"Error listing bucket contents: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-    if not manager.import_files(corpus, paths_to_import, chunk_size, chunk_overlap, timeout):
+    if not manager.import_files(
+        corpus, paths_to_import, chunk_size, chunk_overlap, timeout
+    ):
         raise typer.Exit(code=1)
 
 

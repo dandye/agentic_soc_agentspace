@@ -7,19 +7,17 @@ Agentic SOC AgentSpace system including agent engines, AgentSpace apps,
 OAuth authorizations, data stores, and RAG corpora.
 """
 
-import sys
 from pathlib import Path
+import sys
 
-import typer
 from rich.console import Console
+import typer
 from typing_extensions import Annotated
 
 # Import management apps from installation_scripts
 sys.path.insert(0, str(Path(__file__).parent / "installation_scripts"))
 
-from installation_scripts.manage_agent_engine import (
-    app as agent_engine_app,
-)
+from installation_scripts.manage_agent_engine import app as agent_engine_app
 from installation_scripts.manage_agentspace import app as agentspace_app
 from installation_scripts.manage_datastore import app as datastore_app
 from installation_scripts.manage_oauth import app as oauth_app
@@ -37,8 +35,12 @@ app = typer.Typer(
 )
 
 # Mount existing management apps as subcommands
-app.add_typer(agent_engine_app, name="agent-engine", help="Manage Agent Engine instances")
-app.add_typer(agentspace_app, name="agentspace", help="Manage AgentSpace apps and agents")
+app.add_typer(
+    agent_engine_app, name="agent-engine", help="Manage Agent Engine instances"
+)
+app.add_typer(
+    agentspace_app, name="agentspace", help="Manage AgentSpace apps and agents"
+)
 app.add_typer(oauth_app, name="oauth", help="Manage OAuth authorizations")
 app.add_typer(datastore_app, name="datastore", help="Manage data stores")
 app.add_typer(rag_app, name="rag", help="Manage RAG corpora")
@@ -74,7 +76,9 @@ def full_deploy(
     console.print("Then save the AGENT_ENGINE_RESOURCE_NAME to your .env file\n")
 
     if not typer.confirm("Have you deployed the agent engine?"):
-        console.print("[red]Deployment cancelled. Please deploy the agent engine first.[/red]")
+        console.print(
+            "[red]Deployment cancelled. Please deploy the agent engine first.[/red]"
+        )
         raise typer.Exit(code=1)
 
     # Step 2: Create OAuth authorization
@@ -123,7 +127,9 @@ def full_deploy(
         console.print("[red]Failed to link agent to AgentSpace[/red]")
         raise typer.Exit(code=1)
 
-    console.print("\n[bold green]Full deployment workflow completed successfully![/bold green]")
+    console.print(
+        "\n[bold green]Full deployment workflow completed successfully![/bold green]"
+    )
 
 
 @workflow_app.command("redeploy-all")
@@ -161,7 +167,9 @@ def redeploy_all(
         console.print("[red]Failed to update AgentSpace[/red]")
         raise typer.Exit(code=1)
 
-    console.print("\n[bold green]Full redeployment completed successfully![/bold green]")
+    console.print(
+        "\n[bold green]Full redeployment completed successfully![/bold green]"
+    )
 
 
 @workflow_app.command("status")
@@ -239,7 +247,9 @@ def setup(
 
             shutil.copy(env_example, env_file)
             console.print(f"[green]Created {env_file} from template[/green]")
-            console.print(f"[yellow]Please edit {env_file} with your configuration[/yellow]")
+            console.print(
+                f"[yellow]Please edit {env_file} with your configuration[/yellow]"
+            )
         else:
             console.print(
                 f"[yellow]No .env.example found. Please create {env_file} manually[/yellow]"
@@ -250,10 +260,10 @@ def setup(
     # Check Python dependencies
     console.print("\n[yellow]Checking Python dependencies...[/yellow]")
     try:
+        from dotenv import load_dotenv
         import google.adk
         import google.auth
         import vertexai
-        from dotenv import load_dotenv
 
         console.print("[green]All required packages are installed[/green]")
     except ImportError as e:
@@ -266,7 +276,9 @@ def setup(
     console.print("\n[bold green]Setup complete![/bold green]")
     console.print("\n[yellow]Next steps:[/yellow]")
     console.print(f"  1. Edit {env_file} with your configuration")
-    console.print("  2. Run: [cyan]python manage.py agent-engine deploy[/cyan] (or python main.py)")
+    console.print(
+        "  2. Run: [cyan]python manage.py agent-engine deploy[/cyan] (or python main.py)"
+    )
     console.print("  3. Run: [cyan]python manage.py workflow full-deploy[/cyan]")
 
 

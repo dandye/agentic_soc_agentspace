@@ -7,33 +7,31 @@ listing, testing, and deleting deployed agent engines.
 """
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 import os
-import sys
-from datetime import datetime
 from pathlib import Path
+import sys
 from typing import Dict, List, Optional
 
-import typer
-import vertexai
 from dotenv import load_dotenv
 from google.api_core import client_options
 from google.cloud import aiplatform
-from google.cloud.aiplatform_v1beta1 import (
-    DeleteReasoningEngineRequest,
-    ReasoningEngineServiceClient,
-)
+from google.cloud.aiplatform_v1beta1 import DeleteReasoningEngineRequest
+from google.cloud.aiplatform_v1beta1 import ReasoningEngineServiceClient
+import typer
 from typing_extensions import Annotated
+import vertexai
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
 
 # Import SOC Agent package
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from soc_agent import create_agent
-
 # Additional imports for deployment
 import shutil
+
+from soc_agent import create_agent
 
 app = typer.Typer(
     add_completion=False,
@@ -44,12 +42,13 @@ app = typer.Typer(
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 if DEBUG:
-    os.environ['GRPC_VERBOSITY'] = 'DEBUG'
-    os.environ['GRPC_TRACE'] = 'all'
+    os.environ["GRPC_VERBOSITY"] = "DEBUG"
+    os.environ["GRPC_TRACE"] = "all"
     logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger('google').setLevel(logging.DEBUG)
-    logging.getLogger('google.auth').setLevel(logging.DEBUG)
-    logging.getLogger('google.api_core').setLevel(logging.DEBUG)
+    logging.getLogger("google").setLevel(logging.DEBUG)
+    logging.getLogger("google.auth").setLevel(logging.DEBUG)
+    logging.getLogger("google.api_core").setLevel(logging.DEBUG)
+
 
 class AgentEngineManager:
     """Manages Agent Engine operations in Vertex AI."""
@@ -93,9 +92,7 @@ class AgentEngineManager:
                 fg=typer.colors.GREEN,
             )
         except Exception as e:
-            typer.secho(
-                f" Failed to initialize Vertex AI: {e}", fg=typer.colors.RED
-            )
+            typer.secho(f" Failed to initialize Vertex AI: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
     def _format_timestamp(self, timestamp) -> str:
@@ -269,13 +266,13 @@ class AgentEngineManager:
 
         # Set debug mode
         if debug:
-            os.environ['DEBUG'] = 'True'
-            os.environ['GRPC_VERBOSITY'] = 'DEBUG'
-            os.environ['GRPC_TRACE'] = 'all'
+            os.environ["DEBUG"] = "True"
+            os.environ["GRPC_VERBOSITY"] = "DEBUG"
+            os.environ["GRPC_TRACE"] = "all"
             logging.basicConfig(level=logging.DEBUG)
-            logging.getLogger('google').setLevel(logging.DEBUG)
-            logging.getLogger('google.auth').setLevel(logging.DEBUG)
-            logging.getLogger('google.api_core').setLevel(logging.DEBUG)
+            logging.getLogger("google").setLevel(logging.DEBUG)
+            logging.getLogger("google.auth").setLevel(logging.DEBUG)
+            logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
         try:
             # Load environment variables
@@ -292,14 +289,14 @@ class AgentEngineManager:
                 "SOAR_URL",
                 "SOAR_API_KEY",
                 "GTI_API_KEY",
-                "RAG_CORPUS_ID"
+                "RAG_CORPUS_ID",
             ]
 
             missing_vars = [var for var in required_vars if not os.environ.get(var)]
             if missing_vars:
                 typer.secho(
                     f" Missing required environment variables: {', '.join(missing_vars)}",
-                    fg=typer.colors.RED
+                    fg=typer.colors.RED,
                 )
                 return None
 
@@ -316,7 +313,9 @@ class AgentEngineManager:
             )
 
             # Copy service account file to where MCP server expects it
-            CHRONICLE_SERVICE_ACCOUNT_PATH = os.environ.get("CHRONICLE_SERVICE_ACCOUNT_PATH")
+            CHRONICLE_SERVICE_ACCOUNT_PATH = os.environ.get(
+                "CHRONICLE_SERVICE_ACCOUNT_PATH"
+            )
             if CHRONICLE_SERVICE_ACCOUNT_PATH:
                 dest_dir = Path("./mcp-security/server/secops/secops_mcp/")
                 dest_dir.mkdir(parents=True, exist_ok=True)
@@ -341,7 +340,9 @@ class AgentEngineManager:
                 "CHRONICLE_PROJECT_ID": os.environ.get("GCP_PROJECT_ID"),
                 "CHRONICLE_CUSTOMER_ID": os.environ.get("CHRONICLE_CUSTOMER_ID"),
                 "CHRONICLE_REGION": os.environ.get("CHRONICLE_REGION", "us"),
-                "GOOGLE_GENAI_USE_VERTEXAI": os.environ.get("GCP_VERTEXAI_ENABLED", "True"),
+                "GOOGLE_GENAI_USE_VERTEXAI": os.environ.get(
+                    "GCP_VERTEXAI_ENABLED", "True"
+                ),
                 "LOCATION": os.environ.get("GCP_LOCATION"),
                 "GCP_LOCATION": os.environ.get("GCP_LOCATION"),  # testing
                 "PROJECT_ID": os.environ.get("GCP_PROJECT_ID"),
@@ -388,6 +389,7 @@ class AgentEngineManager:
         except Exception as e:
             typer.secho(f" Error creating agent: {e}", fg=typer.colors.RED)
             import traceback
+
             typer.echo(traceback.format_exc())
             return None
 
@@ -424,15 +426,15 @@ class AgentEngineManager:
         typer.echo(f"Created session: {session.get('id')}")
 
         events = []
-        test_message = "Search RAG Corpus for Malware IRP runbook and get the objective."
-        #test_message = "List rules with ursnif in the name."
-        #test_message = "List the first page of soar cases."
+        test_message = (
+            "Search RAG Corpus for Malware IRP runbook and get the objective."
+        )
+        # test_message = "List rules with ursnif in the name."
+        # test_message = "List the first page of soar cases."
 
         typer.echo(f"Sending test query: {test_message}")
         async for event in remote_app.async_stream_query(
-            user_id=user_id,
-            session_id=session.get("id"),
-            message=test_message
+            user_id=user_id, session_id=session.get("id"), message=test_message
         ):
             typer.echo(f"Event: {event}")
             events.append(event)
@@ -440,7 +442,10 @@ class AgentEngineManager:
         if not events:
             typer.secho(" No events received from agent!", fg=typer.colors.YELLOW)
         else:
-            typer.secho(f" Test completed successfully - received {len(events)} events", fg=typer.colors.GREEN)
+            typer.secho(
+                f" Test completed successfully - received {len(events)} events",
+                fg=typer.colors.GREEN,
+            )
 
     def inspect_agent(self, resource_name: str, verbose: bool = False) -> bool:
         """
@@ -465,14 +470,20 @@ class AgentEngineManager:
             # Display basic information
             typer.secho("\nBasic Information:", fg=typer.colors.YELLOW, bold=True)
             typer.echo(f"Resource Name: {resource_name}")
-            if hasattr(remote_app, 'display_name'):
+            if hasattr(remote_app, "display_name"):
                 typer.echo(f"Display Name: {remote_app.display_name}")
 
             # Try to access various attributes
             typer.secho("\nAgent Attributes:", fg=typer.colors.YELLOW, bold=True)
             interesting_attrs = [
-                'resource_name', 'display_name', 'create_time', 'update_time',
-                'state', 'spec', 'deployment_spec', 'service_account'
+                "resource_name",
+                "display_name",
+                "create_time",
+                "update_time",
+                "state",
+                "spec",
+                "deployment_spec",
+                "service_account",
             ]
 
             for attr in interesting_attrs:
@@ -480,33 +491,41 @@ class AgentEngineManager:
                     try:
                         value = getattr(remote_app, attr)
                         if value is not None and not callable(value):
-                            if attr in ['create_time', 'update_time']:
+                            if attr in ["create_time", "update_time"]:
                                 typer.echo(f"{attr}: {value}")
                             else:
                                 typer.echo(f"{attr}: {value}")
                     except Exception as e:
-                        typer.secho(f"{attr}: Error accessing - {e}", fg=typer.colors.RED)
+                        typer.secho(
+                            f"{attr}: Error accessing - {e}", fg=typer.colors.RED
+                        )
 
             # Get full REST API response for detailed inspection
             if verbose:
-                typer.secho("\nFetching detailed configuration via REST API...", fg=typer.colors.YELLOW, bold=True)
+                typer.secho(
+                    "\nFetching detailed configuration via REST API...",
+                    fg=typer.colors.YELLOW,
+                    bold=True,
+                )
                 try:
                     # Use gcloud auth to get access token
                     import subprocess
+
                     result = subprocess.run(
-                        ['gcloud', 'auth', 'print-access-token'],
+                        ["gcloud", "auth", "print-access-token"],
                         capture_output=True,
                         text=True,
-                        check=True
+                        check=True,
                     )
                     access_token = result.stdout.strip()
 
                     # Make REST API call
                     import requests
+
                     api_url = f"https://{self.location}-aiplatform.googleapis.com/v1/{resource_name}"
                     headers = {
-                        'Authorization': f'Bearer {access_token}',
-                        'Content-Type': 'application/json'
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/json",
                     }
 
                     response = requests.get(api_url, headers=headers)
@@ -517,39 +536,65 @@ class AgentEngineManager:
                         typer.echo(json.dumps(data, indent=2))
 
                         # Try to extract service account if present
-                        if 'spec' in data and 'serviceAccount' in data.get('spec', {}):
-                            typer.secho(f"\nService Account: {data['spec']['serviceAccount']}",
-                                       fg=typer.colors.GREEN, bold=True)
+                        if "spec" in data and "serviceAccount" in data.get("spec", {}):
+                            typer.secho(
+                                f"\nService Account: {data['spec']['serviceAccount']}",
+                                fg=typer.colors.GREEN,
+                                bold=True,
+                            )
 
                         # Show environment variables if present
-                        if 'spec' in data:
-                            spec = data['spec']
-                            if 'deploymentSpec' in spec:
-                                deploy_spec = spec['deploymentSpec']
-                                if 'env' in deploy_spec:
-                                    typer.secho("\nEnvironment Variables:", fg=typer.colors.YELLOW, bold=True)
-                                    for env_var in deploy_spec['env']:
-                                        name = env_var.get('name', '')
-                                        value = env_var.get('value', '')
+                        if "spec" in data:
+                            spec = data["spec"]
+                            if "deploymentSpec" in spec:
+                                deploy_spec = spec["deploymentSpec"]
+                                if "env" in deploy_spec:
+                                    typer.secho(
+                                        "\nEnvironment Variables:",
+                                        fg=typer.colors.YELLOW,
+                                        bold=True,
+                                    )
+                                    for env_var in deploy_spec["env"]:
+                                        name = env_var.get("name", "")
+                                        value = env_var.get("value", "")
                                         # Mask sensitive values
-                                        if any(x in name.upper() for x in ['KEY', 'SECRET', 'PASSWORD', 'TOKEN']):
-                                            value = '*' * 8
+                                        if any(
+                                            x in name.upper()
+                                            for x in [
+                                                "KEY",
+                                                "SECRET",
+                                                "PASSWORD",
+                                                "TOKEN",
+                                            ]
+                                        ):
+                                            value = "*" * 8
                                         typer.echo(f"  {name}: {value}")
                     else:
-                        typer.secho(f"\nREST API Error: {response.status_code}", fg=typer.colors.RED)
+                        typer.secho(
+                            f"\nREST API Error: {response.status_code}",
+                            fg=typer.colors.RED,
+                        )
                         typer.echo(response.text)
 
                 except Exception as e:
-                    typer.secho(f"\nError fetching REST API details: {e}", fg=typer.colors.RED)
+                    typer.secho(
+                        f"\nError fetching REST API details: {e}", fg=typer.colors.RED
+                    )
                     logging.error(f"REST API error: {e}", exc_info=True)
 
             # Show recommendations
             typer.secho("\nRecommendations:", fg=typer.colors.YELLOW, bold=True)
-            typer.echo("1. Reasoning Engines typically use the Vertex AI service agent:")
-            typer.echo(f"   service-{self.project.split('/')[-1] if '/' not in self.project else 'PROJECT_NUMBER'}@gcp-sa-aiplatform.iam.gserviceaccount.com")
+            typer.echo(
+                "1. Reasoning Engines typically use the Vertex AI service agent:"
+            )
+            typer.echo(
+                f"   service-{self.project.split('/')[-1] if '/' not in self.project else 'PROJECT_NUMBER'}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+            )
             typer.echo("2. Or the Compute Engine default service account:")
             typer.echo("   PROJECT_NUMBER-compute@developer.gserviceaccount.com")
-            typer.echo("3. Grant necessary permissions to the appropriate service account")
+            typer.echo(
+                "3. Grant necessary permissions to the appropriate service account"
+            )
 
             return True
 
@@ -603,11 +648,15 @@ def list(
 def delete(
     resource: Annotated[
         Optional[str],
-        typer.Option("--resource", "-r", help="Full resource name of the agent to delete"),
+        typer.Option(
+            "--resource", "-r", help="Full resource name of the agent to delete"
+        ),
     ] = None,
     index: Annotated[
         Optional[int],
-        typer.Option("--index", "-i", help="Index of the agent from the list to delete"),
+        typer.Option(
+            "--index", "-i", help="Index of the agent from the list to delete"
+        ),
     ] = None,
     force: Annotated[
         bool, typer.Option("--force", "-f", help="Skip confirmation prompt")
@@ -665,7 +714,9 @@ def create(
         typer.echo("\nSave these values to your .env file:")
         typer.echo(f"AGENT_ENGINE_RESOURCE_NAME={resource_name}")
         # Extract the numeric ID from the resource name
-        engine_id = resource_name.split('/')[-1] if '/' in resource_name else resource_name
+        engine_id = (
+            resource_name.split("/")[-1] if "/" in resource_name else resource_name
+        )
         typer.echo(f"AGENT_ENGINE_ID={engine_id}")
     else:
         raise typer.Exit(code=1)
@@ -675,11 +726,13 @@ def create(
 def test(
     resource: Annotated[
         Optional[str],
-        typer.Option("--resource", "-r", help="Full resource name of the agent to test")
+        typer.Option(
+            "--resource", "-r", help="Full resource name of the agent to test"
+        ),
     ] = None,
     index: Annotated[
         Optional[int],
-        typer.Option("--index", "-i", help="Index of the agent from the list to test")
+        typer.Option("--index", "-i", help="Index of the agent from the list to test"),
     ] = None,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -728,14 +781,23 @@ def test(
 def inspect(
     resource: Annotated[
         Optional[str],
-        typer.Option("--resource", "-r", help="Full resource name of the agent to inspect")
+        typer.Option(
+            "--resource", "-r", help="Full resource name of the agent to inspect"
+        ),
     ] = None,
     index: Annotated[
         Optional[int],
-        typer.Option("--index", "-i", help="Index of the agent from the list to inspect")
+        typer.Option(
+            "--index", "-i", help="Index of the agent from the list to inspect"
+        ),
     ] = None,
     verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Show detailed information including REST API response")
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show detailed information including REST API response",
+        ),
     ] = False,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")

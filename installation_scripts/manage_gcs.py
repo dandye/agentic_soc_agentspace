@@ -6,16 +6,17 @@ This script manages GCS operations for uploading local files
 to be imported into Vertex AI RAG corpora.
 """
 
-import os
+from datetime import datetime
 import mimetypes
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 
-from google.cloud import storage
-from google.cloud.exceptions import NotFound, Conflict
-from google.auth import default
 from dotenv import load_dotenv
+from google.auth import default
+from google.cloud import storage
+from google.cloud.exceptions import Conflict
+from google.cloud.exceptions import NotFound
 import typer
 from typing_extensions import Annotated
 
@@ -29,7 +30,7 @@ class GCSManager:
     """Manages Google Cloud Storage operations for RAG imports."""
 
     # RAG supported file extensions
-    SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.md', '.html', '.json', '.csv', '.tsv'}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".html", ".json", ".csv", ".tsv"}
     MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB limit for RAG
 
     def __init__(self, env_file: Path):
@@ -69,14 +70,15 @@ class GCSManager:
         try:
             credentials, _ = default()
             self.storage_client = storage.Client(
-                project=self.project_id,
-                credentials=credentials
+                project=self.project_id, credentials=credentials
             )
         except Exception as e:
             typer.secho(f" Failed to initialize GCS client: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-    def _get_or_create_bucket(self, bucket_name: Optional[str] = None) -> storage.Bucket:
+    def _get_or_create_bucket(
+        self, bucket_name: Optional[str] = None
+    ) -> storage.Bucket:
         """
         Get existing bucket or create if it doesn't exist.
 
@@ -99,11 +101,10 @@ class GCSManager:
         except NotFound:
             typer.echo(f"Bucket '{name}' not found. Creating...")
             try:
-                bucket = self.storage_client.create_bucket(
-                    name,
-                    location=self.location
+                bucket = self.storage_client.create_bucket(name, location=self.location)
+                typer.secho(
+                    f"Bucket '{name}' created successfully.", fg=typer.colors.GREEN
                 )
-                typer.secho(f"Bucket '{name}' created successfully.", fg=typer.colors.GREEN)
                 return bucket
             except Exception as e:
                 typer.secho(f"Error creating bucket '{name}': {e}", fg=typer.colors.RED)
@@ -150,7 +151,7 @@ class GCSManager:
         file_path: Path,
         bucket_name: Optional[str] = None,
         gcs_path: Optional[str] = None,
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> str:
         """
         Upload a single file to GCS.
@@ -189,7 +190,9 @@ class GCSManager:
 
         # Upload the file
         try:
-            typer.echo(f"Uploading {file_path.name} to gs://{bucket.name}/{blob_name}...")
+            typer.echo(
+                f"Uploading {file_path.name} to gs://{bucket.name}/{blob_name}..."
+            )
 
             # Set content type
             content_type, _ = mimetypes.guess_type(str(file_path))
@@ -212,7 +215,7 @@ class GCSManager:
         file_paths: List[Path],
         bucket_name: Optional[str] = None,
         gcs_path_prefix: Optional[str] = None,
-        overwrite: bool = False
+        overwrite: bool = False,
     ) -> List[str]:
         """
         Upload multiple files to GCS.
@@ -252,7 +255,10 @@ class GCSManager:
 
         # Summary
         typer.echo("=" * 80)
-        typer.secho(f"Successfully uploaded: {len(uploaded_uris)}/{len(file_paths)}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Successfully uploaded: {len(uploaded_uris)}/{len(file_paths)}",
+            fg=typer.colors.GREEN,
+        )
         if failed_files:
             typer.secho(f"Failed uploads: {len(failed_files)}", fg=typer.colors.YELLOW)
             for filename in failed_files:
@@ -302,7 +308,7 @@ class GCSManager:
         self,
         bucket_name: Optional[str] = None,
         prefix: Optional[str] = None,
-        verbose: bool = False
+        verbose: bool = False,
     ) -> bool:
         """
         List files in a GCS bucket.
@@ -356,10 +362,7 @@ class GCSManager:
             return False
 
     def delete_file(
-        self,
-        gcs_uri: str,
-        force: bool = False,
-        dry_run: bool = False
+        self, gcs_uri: str, force: bool = False, dry_run: bool = False
     ) -> bool:
         """
         Delete a file from GCS.
@@ -379,7 +382,10 @@ class GCSManager:
 
         uri_parts = gcs_uri[5:].split("/", 1)
         if len(uri_parts) != 2:
-            typer.secho("Error: Invalid GCS URI format. Use: gs://bucket/path/to/file", fg=typer.colors.RED)
+            typer.secho(
+                "Error: Invalid GCS URI format. Use: gs://bucket/path/to/file",
+                fg=typer.colors.RED,
+            )
             return False
 
         bucket_name, blob_name = uri_parts
@@ -410,7 +416,9 @@ class GCSManager:
 
             # Delete the file
             blob.delete()
-            typer.secho(f"\nFile deleted successfully: {gcs_uri}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"\nFile deleted successfully: {gcs_uri}", fg=typer.colors.GREEN
+            )
             return True
 
         except NotFound:
@@ -421,11 +429,7 @@ class GCSManager:
             return False
 
     def delete_prefix(
-        self,
-        bucket_name: str,
-        prefix: str,
-        force: bool = False,
-        dry_run: bool = False
+        self, bucket_name: str, prefix: str, force: bool = False, dry_run: bool = False
     ) -> bool:
         """
         Delete all files with a given prefix.
@@ -462,7 +466,9 @@ class GCSManager:
 
             # Confirm deletion
             if not force:
-                if not typer.confirm(f"\nAre you sure you want to delete {len(blobs)} file(s)?"):
+                if not typer.confirm(
+                    f"\nAre you sure you want to delete {len(blobs)} file(s)?"
+                ):
                     typer.echo("Cancelled.")
                     return False
 
@@ -473,9 +479,13 @@ class GCSManager:
                     blob.delete()
                     deleted_count += 1
                 except Exception as e:
-                    typer.secho(f"Error deleting {blob.name}: {e}", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        f"Error deleting {blob.name}: {e}", fg=typer.colors.YELLOW
+                    )
 
-            typer.secho(f"\nDeleted {deleted_count}/{len(blobs)} file(s)", fg=typer.colors.GREEN)
+            typer.secho(
+                f"\nDeleted {deleted_count}/{len(blobs)} file(s)", fg=typer.colors.GREEN
+            )
             return True
 
         except NotFound:
@@ -489,7 +499,7 @@ class GCSManager:
         self,
         bucket_name: str,
         location: Optional[str] = None,
-        storage_class: str = "STANDARD"
+        storage_class: str = "STANDARD",
     ) -> bool:
         """
         Create a new GCS bucket.
@@ -506,7 +516,9 @@ class GCSManager:
             # Check if bucket already exists
             try:
                 existing_bucket = self.storage_client.get_bucket(bucket_name)
-                typer.secho(f"Bucket already exists: {bucket_name}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"Bucket already exists: {bucket_name}", fg=typer.colors.YELLOW
+                )
                 typer.echo(f"Location: {existing_bucket.location}")
                 typer.echo(f"Storage Class: {existing_bucket.storage_class}")
                 return False
@@ -520,19 +532,24 @@ class GCSManager:
             typer.echo(f"Storage Class: {storage_class}")
 
             bucket = self.storage_client.create_bucket(
-                bucket_name,
-                location=bucket_location
+                bucket_name, location=bucket_location
             )
             bucket.storage_class = storage_class
             bucket.patch()
 
-            typer.secho(f"\nBucket created successfully: {bucket_name}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"\nBucket created successfully: {bucket_name}", fg=typer.colors.GREEN
+            )
             typer.echo(f"URI: gs://{bucket_name}")
             return True
 
         except Conflict:
-            typer.secho(f"Bucket name already taken: {bucket_name}", fg=typer.colors.RED)
-            typer.echo("Bucket names must be globally unique across all Google Cloud projects.")
+            typer.secho(
+                f"Bucket name already taken: {bucket_name}", fg=typer.colors.RED
+            )
+            typer.echo(
+                "Bucket names must be globally unique across all Google Cloud projects."
+            )
             return False
         except Exception as e:
             typer.secho(f"Error creating bucket: {e}", fg=typer.colors.RED)
@@ -588,7 +605,7 @@ class GCSManager:
         self,
         bucket_name: Optional[str] = None,
         prefix: Optional[str] = None,
-        output_file: Optional[Path] = None
+        output_file: Optional[Path] = None,
     ) -> bool:
         """
         Generate GCS URIs for files in a bucket.
@@ -635,9 +652,12 @@ class GCSManager:
 
 # CLI Commands
 
+
 @app.command()
 def upload(
-    files: Annotated[List[Path], typer.Argument(help="Local files or directories to upload.")],
+    files: Annotated[
+        List[Path], typer.Argument(help="Local files or directories to upload.")
+    ],
     bucket: Annotated[
         Optional[str], typer.Option("--bucket", "-b", help="Target bucket name.")
     ] = None,
@@ -648,7 +668,10 @@ def upload(
         bool, typer.Option("--recursive", "-r", help="Recursively upload directories.")
     ] = False,
     preserve_structure: Annotated[
-        bool, typer.Option("--preserve-structure", help="Preserve directory structure in GCS.")
+        bool,
+        typer.Option(
+            "--preserve-structure", help="Preserve directory structure in GCS."
+        ),
     ] = False,
     overwrite: Annotated[
         bool, typer.Option("--overwrite", help="Overwrite existing files.")
@@ -667,7 +690,10 @@ def upload(
     for file_arg in files:
         if file_arg.is_dir():
             if not recursive:
-                typer.secho(f"Skipping directory (use --recursive to upload): {file_arg}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"Skipping directory (use --recursive to upload): {file_arg}",
+                    fg=typer.colors.YELLOW,
+                )
                 continue
 
             # Set base directory for structure preservation
@@ -699,7 +725,9 @@ def upload(
                 uploaded_uris = []
                 failed_files = []
 
-                typer.echo(f"\nUploading {len(file_paths)} file(s) with preserved structure...")
+                typer.echo(
+                    f"\nUploading {len(file_paths)} file(s) with preserved structure..."
+                )
                 typer.echo()
 
                 for i, file_path in enumerate(file_paths, 1):
@@ -713,7 +741,9 @@ def upload(
                         if path:
                             gcs_file_path = f"{path.rstrip('/')}/{gcs_file_path}"
 
-                        uri = manager.upload_file(file_path, bucket, gcs_file_path, overwrite)
+                        uri = manager.upload_file(
+                            file_path, bucket, gcs_file_path, overwrite
+                        )
                         uploaded_uris.append(uri)
                     except Exception as e:
                         typer.secho(f"  Failed: {e}", fg=typer.colors.YELLOW)
@@ -723,9 +753,14 @@ def upload(
 
                 # Summary
                 typer.echo("=" * 80)
-                typer.secho(f"Successfully uploaded: {len(uploaded_uris)}/{len(file_paths)}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"Successfully uploaded: {len(uploaded_uris)}/{len(file_paths)}",
+                    fg=typer.colors.GREEN,
+                )
                 if failed_files:
-                    typer.secho(f"Failed uploads: {len(failed_files)}", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        f"Failed uploads: {len(failed_files)}", fg=typer.colors.YELLOW
+                    )
             else:
                 # Batch upload without structure preservation
                 manager.upload_files(file_paths, bucket, path, overwrite)
@@ -737,7 +772,8 @@ def upload(
 @app.command()
 def list(
     bucket: Annotated[
-        Optional[str], typer.Option("--bucket", "-b", help="Bucket name to list files from.")
+        Optional[str],
+        typer.Option("--bucket", "-b", help="Bucket name to list files from."),
     ] = None,
     prefix: Annotated[
         Optional[str], typer.Option("--prefix", "-p", help="Filter by prefix.")
@@ -764,18 +800,23 @@ def list(
 
 @app.command()
 def delete(
-    uri: Annotated[Optional[str], typer.Argument(help="GCS URI to delete (gs://...).")] = None,
+    uri: Annotated[
+        Optional[str], typer.Argument(help="GCS URI to delete (gs://...).")
+    ] = None,
     bucket: Annotated[
-        Optional[str], typer.Option("--bucket", "-b", help="Bucket name (for prefix deletion).")
+        Optional[str],
+        typer.Option("--bucket", "-b", help="Bucket name (for prefix deletion)."),
     ] = None,
     prefix: Annotated[
-        Optional[str], typer.Option("--prefix", "-p", help="Delete all files with this prefix.")
+        Optional[str],
+        typer.Option("--prefix", "-p", help="Delete all files with this prefix."),
     ] = None,
     force: Annotated[
         bool, typer.Option("--force", "-f", help="Skip confirmation prompt.")
     ] = False,
     dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Show what would be deleted without deleting.")
+        bool,
+        typer.Option("--dry-run", help="Show what would be deleted without deleting."),
     ] = False,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
@@ -793,7 +834,10 @@ def delete(
         if not manager.delete_prefix(bucket, prefix, force, dry_run):
             raise typer.Exit(code=1)
     else:
-        typer.secho("Error: Provide either a URI or both --bucket and --prefix", fg=typer.colors.RED)
+        typer.secho(
+            "Error: Provide either a URI or both --bucket and --prefix",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
 
@@ -854,10 +898,16 @@ def uri(
 def bucket_create(
     name: Annotated[str, typer.Argument(help="Bucket name to create.")],
     location: Annotated[
-        Optional[str], typer.Option("--location", "-l", help="Bucket location (e.g., us-central1).")
+        Optional[str],
+        typer.Option("--location", "-l", help="Bucket location (e.g., us-central1)."),
     ] = None,
     storage_class: Annotated[
-        str, typer.Option("--storage-class", "-s", help="Storage class (STANDARD, NEARLINE, COLDLINE, ARCHIVE).")
+        str,
+        typer.Option(
+            "--storage-class",
+            "-s",
+            help="Storage class (STANDARD, NEARLINE, COLDLINE, ARCHIVE).",
+        ),
     ] = "STANDARD",
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")

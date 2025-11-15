@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Code Style and Communication
+
+**CRITICAL: Never use emojis. Anywhere. Ever.**
+- No emojis in code comments
+- No emojis in commit messages
+- No emojis in pull request descriptions
+- No emojis in code review comments
+- No emojis in documentation
+- Emojis are unprofessional and must not be used in any context
+
 ## Project Overview
 
 This is a security operations (SOC) agent system built with Google Vertex AI Agent Development Kit (ADK). It deploys AI agents to Google Cloud with integrated access to Chronicle SIEM, SOAR, Google Threat Intelligence, Security Command Center, and RAG-based runbook retrieval through the Model Context Protocol (MCP).
