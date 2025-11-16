@@ -206,7 +206,7 @@ def status(
         "AGENTSPACE_APP_ID",
         "AGENTSPACE_AGENT_ID",
         "OAUTH_AUTH_ID",
-        "RAG_CORPUS_NAME",
+        "RAG_CORPUS_ID",
     ]
 
     for var in env_vars_to_check:
