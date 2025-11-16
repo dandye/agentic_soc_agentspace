@@ -1,16 +1,16 @@
 """
-SOC Agent Package - Simple and Explicit
+SOC Agent Flash Module
 
-This package provides a straightforward Security Operations Agent
-following ADK standards with clear, explicit configuration.
+This module provides a Security Operations Agent using the Gemini 2.5 Flash model,
+optimized for faster response times and lower cost while maintaining good performance.
 
 Usage:
     # Standard ADK import pattern
-    from soc_agent import agent
+    from soc_agent_flash import agent
     my_agent = agent.root_agent
 
     # Or create a fresh agent
-    from soc_agent import create_agent
+    from soc_agent_flash import create_agent
     my_agent = create_agent()
 """
 
