@@ -3,6 +3,32 @@ SOC Agent Module - CTI Researcher Configuration
 
 This module configures a Cyber Threat Intelligence (CTI) Researcher Agent with specific persona,
 responsibilities, and MCP tools for threat intelligence operations.
+
+ARCHITECTURAL DECISION: Intentional Code Duplication
+======================================================
+This module intentionally duplicates code from other soc_agent_* modules
+rather than using shared utilities or inheritance. This is a deliberate
+architectural choice that prioritizes:
+
+1. CLARITY: Each agent module is completely self-contained and can be
+   understood without navigating to other files or understanding complex
+   inheritance hierarchies.
+
+2. INDEPENDENCE: Each agent can be modified, deployed, and debugged
+   independently without risk of breaking other agents through shared
+   code changes.
+
+3. EXPLICITNESS: All configuration and behavior is visible in a single
+   file, making it easier for new team members to understand and modify.
+
+4. STABILITY: Changes to one agent cannot inadvertently affect others,
+   reducing the risk of regression bugs in production.
+
+This approach trades code duplication for reduced complexity and improved
+maintainability in a security-critical environment where reliability and
+clarity are paramount. For this project, we explicitly value clarity over DRY.
+
+See PR #25 discussion for additional context on this architectural decision.
 """
 
 import logging
