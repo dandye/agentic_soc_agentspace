@@ -1,8 +1,8 @@
 """
-SOC Agent Module - Simple and Explicit Configuration
+SOC Agent Flash Module - Gemini 2.5 Flash Configuration
 
-This module shows exactly how to configure a Security Operations Agent
-with MCP tools and RAG retrieval, following ADK standards.
+This module configures a Security Operations Agent using the Gemini 2.5 Flash model
+for faster response times and lower cost, with MCP tools and RAG retrieval.
 
 ARCHITECTURAL DECISION: Intentional Code Duplication
 ======================================================
@@ -145,7 +145,7 @@ def create_agent():
         logging.getLogger("google.auth").setLevel(logging.DEBUG)
         logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
-    # Get service account filename for MCP servers (path already validated above)
+    # Get service account filename for MCP servers (already validated above)
     service_account_filename = service_account_path.name
 
     # Initialize list to collect all tools
@@ -266,8 +266,8 @@ def create_agent():
     logger.info(f"Creating SOC Agent with {len(tools)} tools...")
 
     agent = Agent(
-        model="gemini-2.5-pro",
-        name="soc_assistant",
+        model="gemini-2.5-flash",
+        name="soc_assistant_flash",
         description="Security Operations reasoning agent with access to Agentic SOC MCP tools and runbook search.",
         instruction="""You are a Security Operations assistant with comprehensive access to MCP security tools including RAG-based runbook and documentation retrieval.
 
