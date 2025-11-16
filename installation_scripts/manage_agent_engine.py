@@ -406,6 +406,10 @@ class AgentEngineManager:
                 display_name = "SOC Agent - Flash"
             elif agent_module == "soc_agent":
                 display_name = "SOC Agent - Pro"
+            elif agent_module == "soc_agent_tier1":
+                display_name = "SOC Agent - Tier 1 Analyst"
+            elif agent_module == "soc_agent_cti":
+                display_name = "SOC Agent - CTI Researcher"
             else:
                 # For any future agent modules, use the module name as-is
                 display_name = f"SOC Agent - {agent_module}"
