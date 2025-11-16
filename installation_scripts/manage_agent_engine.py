@@ -31,9 +31,8 @@ from vertexai.preview.reasoning_engines import AdkApp
 # Import SOC Agent package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 # Additional imports for deployment
+import importlib
 import shutil
-
-from soc_agent import create_agent
 
 
 app = typer.Typer(
@@ -252,11 +251,17 @@ class AgentEngineManager:
         agent = agents[index - 1]
         return self.delete_agent(agent["resource_name"], force)
 
-    def create_agent(self, debug: bool = False, no_test: bool = False) -> str | None:
+    def create_agent(
+        self,
+        agent_module: str = "soc_agent",
+        debug: bool = False,
+        no_test: bool = False,
+    ) -> str | None:
         """
         Create and deploy a new Agent Engine instance.
 
         Args:
+            agent_module: Name of the agent module to import (default: "soc_agent")
             debug: Enable debug mode with verbose logging
             no_test: Skip the automatic test after creation
 
@@ -266,6 +271,8 @@ class AgentEngineManager:
         typer.echo("\n" + "=" * 80)
         typer.secho("Creating Agent Engine Instance", fg=typer.colors.BLUE, bold=True)
         typer.echo("=" * 80 + "\n")
+
+        typer.echo(f"Agent module: {agent_module}")
 
         # Set debug mode
         if debug:
@@ -327,9 +334,26 @@ class AgentEngineManager:
             else:
                 raise ValueError("CHRONICLE_SERVICE_ACCOUNT_PATH is not set")
 
-            # Create the agent using soc_agent package
+            # Dynamically import and create the agent from the specified module
+            typer.echo(f"Importing agent from {agent_module}...")
+            try:
+                agent_pkg = importlib.import_module(agent_module)
+                create_agent_func = agent_pkg.create_agent
+            except ImportError as e:
+                typer.secho(
+                    f" Failed to import agent module '{agent_module}': {e}",
+                    fg=typer.colors.RED,
+                )
+                return None
+            except AttributeError:
+                typer.secho(
+                    f" Module '{agent_module}' does not have a 'create_agent' function",
+                    fg=typer.colors.RED,
+                )
+                return None
+
             typer.echo("Creating agent...")
-            agent = create_agent()
+            agent = create_agent_func()
 
             # Create the ADK app
             typer.echo("Creating ADK app...")
@@ -357,11 +381,20 @@ class AgentEngineManager:
                 "VT_APIKEY": os.environ.get("GTI_API_KEY"),
             }
 
+            # Determine display name based on agent module
+            if agent_module == "soc_agent_flash":
+                display_name = "SOC Agent - Flash"
+            elif agent_module == "soc_agent":
+                display_name = "SOC Agent - Pro"
+            else:
+                # For any future agent modules, use the module name as-is
+                display_name = f"SOC Agent - {agent_module}"
+
             # Deploy the agent engine
-            typer.echo("Deploying agent engine to Vertex AI...")
+            typer.echo(f"Deploying agent engine to Vertex AI as '{display_name}'...")
             remote_app = agent_engines.create(
                 app,
-                display_name="Agentic SOC Agent Engine",
+                display_name=display_name,
                 requirements=[
                     "cloudpickle",
                     "google-adk~=1.18.0",
@@ -696,6 +729,14 @@ def delete(
 
 @app.command()
 def create(
+    agent_module: Annotated[
+        str,
+        typer.Option(
+            "--agent-module",
+            "-a",
+            help="Agent module to deploy (e.g., 'soc_agent', 'soc_agent_flash')",
+        ),
+    ] = "soc_agent",
     debug: Annotated[
         bool, typer.Option("--debug", help="Enable debug mode with verbose logging")
     ] = False,
@@ -708,7 +749,7 @@ def create(
 ) -> None:
     """Create and deploy a new Agent Engine instance."""
     manager = AgentEngineManager(env_file)
-    resource_name = manager.create_agent(debug, no_test)
+    resource_name = manager.create_agent(agent_module, debug, no_test)
 
     if resource_name:
         typer.echo("\n" + "=" * 80)

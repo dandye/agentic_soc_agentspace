@@ -20,6 +20,9 @@
 # Default environment file
 ENV_FILE ?= .env
 
+# Agent module selection (default: soc_agent for Pro model)
+AGENT_MODULE ?= soc_agent
+
 # Verbosity control
 V ?= 0
 ifeq ($(V),1)
@@ -130,11 +133,17 @@ clean: ## Clean up temporary files and cache
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
-agent-engine-deploy: check-prereqs ## Deploy the main agent engine
-	$(Q)$(PYTHON) $(MANAGE_AGENT_ENGINE) create
+agent-engine-deploy: check-prereqs ## Deploy agent engine (use AGENT_MODULE=soc_agent_flash for Flash)
+	$(Q)$(PYTHON) $(MANAGE_AGENT_ENGINE) create --agent-module $(AGENT_MODULE)
 	$(Q)echo "========================================"
 	$(Q)echo "Agent deployment complete - check output above for resource details"
 	$(Q)echo "========================================"
+
+agent-engine-deploy-pro: check-prereqs ## Deploy Pro agent (gemini-2.5-pro)
+	$(Q)$(MAKE) agent-engine-deploy AGENT_MODULE=soc_agent
+
+agent-engine-deploy-flash: check-prereqs ## Deploy Flash agent (gemini-2.5-flash)
+	$(Q)$(MAKE) agent-engine-deploy AGENT_MODULE=soc_agent_flash
 
 agent-engine-deploy-and-delete: check-prereqs ## Deploy agent engine and delete after test (for development)
 	$(Q)$(PYTHON) $(MANAGE_AGENT_ENGINE) create
