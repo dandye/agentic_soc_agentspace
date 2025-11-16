@@ -172,6 +172,33 @@ def create_agent():
     GCP_STAGING_BUCKET = os.environ.get("GCP_STAGING_BUCKET")
     GCP_VERTEXAI_ENABLED = os.environ.get("GCP_VERTEXAI_ENABLED", "True")
 
+    # Chronicle/SIEM configuration
+    CHRONICLE_CUSTOMER_ID = os.environ.get("CHRONICLE_CUSTOMER_ID")
+    CHRONICLE_PROJECT_ID = os.environ.get("CHRONICLE_PROJECT_ID")
+    CHRONICLE_REGION = os.environ.get("CHRONICLE_REGION", "us")
+    CHRONICLE_SERVICE_ACCOUNT_PATH = os.environ.get("CHRONICLE_SERVICE_ACCOUNT_PATH")
+
+    # Validate required Chronicle environment variables before Vertex AI initialization.
+    # Note: Comprehensive validation of all required variables happens in
+    # manage_agent_engine.py before deployment. This validates only Chronicle-specific
+    # variables to fail fast before expensive Vertex AI initialization.
+    if not CHRONICLE_PROJECT_ID:
+        raise ValueError(
+            "CHRONICLE_PROJECT_ID is required. Please set it in your .env file."
+        )
+    if not CHRONICLE_SERVICE_ACCOUNT_PATH:
+        raise ValueError(
+            "CHRONICLE_SERVICE_ACCOUNT_PATH is required. Please set it in your .env file."
+        )
+
+    # Verify service account file exists
+    service_account_path = Path(CHRONICLE_SERVICE_ACCOUNT_PATH)
+    if not service_account_path.exists():
+        raise FileNotFoundError(
+            f"Chronicle service account file not found: {CHRONICLE_SERVICE_ACCOUNT_PATH}\n"
+            f"Please verify the path in your .env file points to a valid service account JSON file."
+        )
+
     # Initialize Vertex AI for the agent to work with Gemini models and RAG
     if GCP_PROJECT_ID and GCP_VERTEXAI_ENABLED == "True":
         logger.info(
@@ -183,12 +210,6 @@ def create_agent():
             staging_bucket=GCP_STAGING_BUCKET,
         )
 
-    # Chronicle/SIEM configuration
-    CHRONICLE_CUSTOMER_ID = os.environ.get("CHRONICLE_CUSTOMER_ID")
-    CHRONICLE_PROJECT_ID = os.environ.get("CHRONICLE_PROJECT_ID")
-    CHRONICLE_REGION = os.environ.get("CHRONICLE_REGION", "us")
-    CHRONICLE_SERVICE_ACCOUNT_PATH = os.environ.get("CHRONICLE_SERVICE_ACCOUNT_PATH")
-
     # SOAR configuration
     SOAR_URL = os.environ.get("SOAR_URL")
     SOAR_API_KEY = os.environ.get("SOAR_API_KEY")
@@ -198,8 +219,21 @@ def create_agent():
 
     # RAG configuration
     RAG_CORPUS_ID = os.environ.get("RAG_CORPUS_ID")
-    RAG_SIMILARITY_TOP_K = int(os.environ.get("RAG_SIMILARITY_TOP_K", "10"))
-    RAG_DISTANCE_THRESHOLD = float(os.environ.get("RAG_DISTANCE_THRESHOLD", "0.6"))
+
+    # Parse RAG numeric configuration with error handling
+    try:
+        RAG_SIMILARITY_TOP_K = int(os.environ.get("RAG_SIMILARITY_TOP_K", "10"))
+    except ValueError as e:
+        raise ValueError(
+            f"Invalid RAG_SIMILARITY_TOP_K value. Must be an integer. Error: {e}"
+        )
+
+    try:
+        RAG_DISTANCE_THRESHOLD = float(os.environ.get("RAG_DISTANCE_THRESHOLD", "0.6"))
+    except ValueError as e:
+        raise ValueError(
+            f"Invalid RAG_DISTANCE_THRESHOLD value. Must be a float. Error: {e}"
+        )
 
     # Debug mode
     DEBUG = os.environ.get("DEBUG", "False") == "True"
@@ -211,8 +245,7 @@ def create_agent():
         logging.getLogger("google.auth").setLevel(logging.DEBUG)
         logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
-    # Get service account filename for MCP servers
-    service_account_path = Path(CHRONICLE_SERVICE_ACCOUNT_PATH)
+    # Get service account filename for MCP servers (already validated above)
     service_account_filename = service_account_path.name
 
     # Initialize list to collect all tools
