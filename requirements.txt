@@ -93,7 +93,7 @@ google-auth-httplib2==0.2.0
     # via google-api-python-client
 google-auth-oauthlib==1.2.2
     # via -r requirements.in
-google-cloud-aiplatform[agent-engines]==1.126.1
+google-cloud-aiplatform[agent-engines]==1.127.0
     # via
     #   -r requirements.in
     #   google-adk
@@ -223,13 +223,14 @@ opentelemetry-api==1.37.0
     # via
     #   google-adk
     #   google-cloud-logging
+    #   opentelemetry-exporter-gcp-logging
     #   opentelemetry-exporter-gcp-monitoring
     #   opentelemetry-exporter-gcp-trace
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-resourcedetector-gcp
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-gcp-logging==1.9.0a0
+opentelemetry-exporter-gcp-logging==1.11.0a0
     # via
     #   google-adk
     #   google-cloud-aiplatform
