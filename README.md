@@ -123,12 +123,31 @@ gcloud services enable securitycenter.googleapis.com  # If using SCC tools
 ```
 
 ### Required IAM Permissions
-Your account needs these roles:
+
+**Your account needs these roles:**
 - `roles/aiplatform.user` - Create and manage AI Platform resources
 - `roles/storage.admin` - Manage staging bucket
 - `roles/iam.serviceAccountUser` - Create service accounts for agent
 - `roles/discoveryengine.admin` - Manage AgentSpace (if using)
 - `roles/securitycenter.admin` - Access Security Command Center (if using)
+
+**AI Platform Reasoning Engine Service Agent needs RAG access:**
+
+When you deploy an agent to Agent Engine, Google Cloud uses the AI Platform Reasoning Engine Service Agent to execute your agent. This service account needs permission to query your RAG corpus. Grant the Vertex AI User role:
+
+```bash
+# Get your project number
+GCP_PROJECT_NUMBER=$(gcloud projects describe $GCP_PROJECT_ID --format="value(projectNumber)")
+
+# Grant Vertex AI User role to AI Platform Reasoning Engine Service Agent
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
+  --member="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+```
+
+This resolves the `403 PERMISSION_DENIED` error with message `Permission 'aiplatform.ragCorpora.query' denied` that occurs when the agent attempts to retrieve documents from the RAG corpus.
+
+See [Google Cloud IAM Service Agents documentation](https://cloud.google.com/iam/docs/service-agents) for more details about the AI Platform Reasoning Engine Service Agent.
 
 ### Authentication Setup
 ```bash
@@ -171,12 +190,30 @@ make agent-engine-deploy
 
 ### 6. Create AgentSpace App (Optional)
 
+**Option A: Using the Web UI (Recommended)**
 1. Navigate to [Google Cloud Console](https://console.cloud.google.com)
 2. Go to **Vertex AI > Search & Conversation > Apps**
 3. Click **Create App**
 4. Select **Agent** as the app type
 5. Configure with your preferred settings
 6. Copy the App ID and add to `.env` as `AGENTSPACE_APP_ID`
+
+**Option B: Using the CLI (Advanced)**
+
+> [!IMPORTANT]
+> **CRITICAL**: When creating apps via the API, you MUST include `--app-type APP_TYPE_INTRANET` and `--industry-vertical GENERIC` for apps to appear in the Gemini Enterprise web UI. Without these fields, apps may be created successfully via API but will not be visible in the console UI.
+>
+> See the [official Google Cloud documentation](https://cloud.google.com/gemini/enterprise/docs/create-app) for details.
+
+```bash
+# Create app with proper visibility settings
+python manage.py agentspace create-app \
+  --name "My Security Agent" \
+  --type SOLUTION_TYPE_CHAT \
+  --no-datastore \
+  --app-type APP_TYPE_INTRANET \
+  --industry-vertical GENERIC
+```
 
 ### 7. Register Agent with AgentSpace
 
@@ -287,13 +324,28 @@ make datastore-create NAME="Security Data" TYPE=SOLUTION_TYPE_SEARCH
 
 ## AgentSpace Integration
 
+> [!IMPORTANT]
+> **APP_TYPE_INTRANET Required**: When creating apps programmatically via the API/CLI, you MUST include `appType=APP_TYPE_INTRANET` and `industryVertical=GENERIC` for apps to be visible in the Gemini Enterprise web UI. Apps created through the console UI include these fields automatically. See the [official documentation](https://cloud.google.com/gemini/enterprise/docs/create-app).
+
+**Option 1: Create via Console (Recommended)**
 1. **Create AgentSpace App** - Via [Console](https://console.cloud.google.com)
    - Navigate to Vertex AI > Search & Conversation > Apps
    - Click **Create App** and select **Agent** type
    - Configure with your preferred settings
    - Note: The agent uses RAG for document retrieval, not Discovery Engine data stores
-
 2. **Copy App ID** to `.env` as `AGENTSPACE_APP_ID`
+
+**Option 2: Create via CLI (Advanced)**
+```bash
+python manage.py agentspace create-app \
+  --name "Security Agent" \
+  --type SOLUTION_TYPE_CHAT \
+  --no-datastore \
+  --app-type APP_TYPE_INTRANET \
+  --industry-vertical GENERIC
+```
+
+**After creating the app:**
 3. **Register agent**: `make agentspace-link-agent` (add OAuth with `make oauth-setup` first if needed)
 4. **Verify**: `make agentspace-verify`
 
