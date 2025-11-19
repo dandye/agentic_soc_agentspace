@@ -1,8 +1,8 @@
 """
-SOC Agent Module - Simple and Explicit Configuration
+SOC Agent Flash Module - Gemini 2.5 Flash Configuration
 
-This module shows exactly how to configure a Security Operations Agent
-with MCP tools and RAG retrieval, following ADK standards.
+This module configures a Security Operations Agent using the Gemini 2.5 Flash model
+for faster response times and lower cost, with MCP tools and RAG retrieval.
 
 ARCHITECTURAL DECISION: Intentional Code Duplication
 ======================================================
@@ -38,6 +38,7 @@ from pathlib import Path
 import vertexai
 from dotenv import load_dotenv
 from google.adk.agents import Agent
+from google.adk.tools import AgentTool, google_search
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrieval
@@ -145,7 +146,7 @@ def create_agent():
         logging.getLogger("google.auth").setLevel(logging.DEBUG)
         logging.getLogger("google.api_core").setLevel(logging.DEBUG)
 
-    # Get service account filename for MCP servers (path already validated above)
+    # Get service account filename for MCP servers (already validated above)
     service_account_filename = service_account_path.name
 
     # Initialize list to collect all tools
@@ -261,13 +262,18 @@ def create_agent():
         logger.warning("RAG_CORPUS_ID not configured, skipping RAG retrieval tool")
 
     # ========================================================================
+    # Add google_search as an AgentTool
+    # ========================================================================
+    tools.append(AgentTool(agent=google_search))
+
+    # ========================================================================
     # Create the Agent with all configured tools
     # ========================================================================
     logger.info(f"Creating SOC Agent with {len(tools)} tools...")
 
     agent = Agent(
-        model="gemini-2.5-pro",
-        name="soc_assistant",
+        model="gemini-3.0-flash",
+        name="soc_assistant_flash_3",
         description="Security Operations reasoning agent with access to Agentic SOC MCP tools and runbook search.",
         instruction="""You are a Security Operations assistant with comprehensive access to MCP security tools including RAG-based runbook and documentation retrieval.
 

@@ -16,6 +16,12 @@ import typer
 from dotenv import load_dotenv
 from google.auth.transport import requests as google_requests
 
+# Import validation utilities
+from installation_scripts.env_validation import (
+    format_validation_errors,
+    validate_env_vars,
+)
+
 
 app = typer.Typer(
     add_completion=False,
@@ -97,7 +103,12 @@ class AgentSpaceManager:
         return self.creds.token
 
     def _validate_environment(self) -> tuple[bool, list]:
-        """Validate required environment variables for AgentSpace operations."""
+        """
+        Validate required environment variables for AgentSpace operations.
+
+        Returns:
+            Tuple of (is_valid, errors) where errors is a list of ValidationError objects
+        """
         required_vars = [
             "GCP_PROJECT_ID",
             "GCP_PROJECT_NUMBER",
@@ -105,8 +116,9 @@ class AgentSpaceManager:
             "AGENT_ENGINE_RESOURCE_NAME",
             "GCP_LOCATION",
         ]
-        missing = [var for var in required_vars if not self.env_vars.get(var)]
-        return not missing, missing
+        # Use enhanced validation that checks for placeholders
+        is_valid, errors = validate_env_vars(required_vars, self.env_vars)
+        return is_valid, errors
 
     def _make_request(
         self, method: str, url: str, **kwargs: Any
@@ -123,10 +135,41 @@ class AgentSpaceManager:
         }
         headers.update(kwargs.pop("headers", {}))
 
+        # Add default timeout if not specified (60 seconds)
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = 60
+
+        # Debug output
+        debug = self.env_vars.get("DEBUG", "").lower() in ["true", "1", "yes"]
+        if debug:
+            typer.echo(f"DEBUG: {method} {url}")
+            if "json" in kwargs:
+                import json as json_lib
+
+                typer.echo(
+                    f"DEBUG: Request body: {json_lib.dumps(kwargs['json'], indent=2)}"
+                )
+            typer.echo(f"DEBUG: Timeout: {kwargs['timeout']}s")
+
         try:
+            typer.echo(f"  Sending {method} request to API...")
             response = requests.request(method, url, headers=headers, **kwargs)
+            if debug:
+                typer.echo(f"DEBUG: Response status: {response.status_code}")
+                typer.echo(f"DEBUG: Response body: {response.text[:500]}")
             response.raise_for_status()
+            typer.echo(f"  API response received (status {response.status_code})")
             return response
+        except requests.exceptions.Timeout:
+            typer.secho(
+                f" API request timed out after {kwargs['timeout']}s",
+                fg=typer.colors.RED,
+            )
+            typer.secho(
+                "  CHAT apps may take longer to create (requires Dialogflow setup)",
+                fg=typer.colors.YELLOW,
+            )
+            return None
         except requests.exceptions.RequestException as e:
             typer.secho(f" API request failed: {e}", fg=typer.colors.RED)
             if e.response is not None:
@@ -182,12 +225,11 @@ class AgentSpaceManager:
     def register_agent(self, force: bool = False) -> bool:
         """Register agent with AgentSpace."""
         typer.echo("Registering agent with AgentSpace...")
-        is_valid, missing = self._validate_environment()
+        is_valid, errors = self._validate_environment()
         if not is_valid:
-            typer.secho(
-                f" Missing required variables: {', '.join(missing)}",
-                fg=typer.colors.RED,
-            )
+            typer.secho(" Configuration Error", fg=typer.colors.RED, bold=True)
+            typer.echo()
+            typer.echo(format_validation_errors(errors))
             return False
 
         if self.env_vars.get("AGENTSPACE_AGENT_ID") and not force:
@@ -252,12 +294,11 @@ class AgentSpaceManager:
     def verify_agent(self) -> bool:
         """Verify AgentSpace agent configuration and status."""
         typer.echo("Verifying AgentSpace configuration...")
-        is_valid, missing = self._validate_environment()
+        is_valid, errors = self._validate_environment()
         if not is_valid:
-            typer.secho(
-                f" Missing required variables: {', '.join(missing)}",
-                fg=typer.colors.RED,
-            )
+            typer.secho(" Configuration Error", fg=typer.colors.RED, bold=True)
+            typer.echo()
+            typer.echo(format_validation_errors(errors))
             return False
 
         agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
@@ -274,9 +315,11 @@ class AgentSpaceManager:
             return True
         return False
 
-    def delete_agent(self, force: bool = False) -> bool:
+    def delete_agent(self, force: bool = False, agent_id: str | None = None) -> bool:
         """Delete agent from AgentSpace."""
-        agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
+        if not agent_id:
+            agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
+
         if not agent_id:
             typer.secho(" No agent registered to delete.", fg=typer.colors.RED)
             return True
@@ -291,7 +334,9 @@ class AgentSpaceManager:
         response = self._make_request("DELETE", api_url)
         if response and response.status_code in [200, 204]:
             typer.secho(" Agent deleted successfully!", fg=typer.colors.GREEN)
-            self._update_env_var("AGENTSPACE_AGENT_ID", "")
+            # Only clear env var if we deleted the agent that was in .env
+            if agent_id == self.env_vars.get("AGENTSPACE_AGENT_ID"):
+                self._update_env_var("AGENTSPACE_AGENT_ID", "")
             return True
         return False
 
@@ -301,15 +346,28 @@ class AgentSpaceManager:
         solution_type: str = "SOLUTION_TYPE_SEARCH",
         data_store_ids: list | None = None,
         enable_chat: bool = False,
+        skip_datastore: bool = False,
+        app_type: str | None = None,
+        industry_vertical: str | None = None,
     ) -> bool:
         """
         Create a new AgentSpace app (engine) in Discovery Engine.
+
+        CRITICAL: For apps to appear in the Gemini Enterprise web UI, you MUST include
+        appType=APP_TYPE_INTRANET and industryVertical=GENERIC. Without these fields,
+        apps may not be visible in the UI even if API creation succeeds.
+
+        Official documentation:
+        https://cloud.google.com/gemini/enterprise/docs/create-app
 
         Args:
             app_name: Name for the app (will be used to generate app_id)
             solution_type: Type of solution (SOLUTION_TYPE_SEARCH, SOLUTION_TYPE_CHAT, etc.)
             data_store_ids: List of data store IDs to associate with the app
             enable_chat: Whether to enable chat features (requires Dialogflow API)
+            skip_datastore: Explicitly skip adding data stores (for web UI compatibility)
+            app_type: App type (e.g., APP_TYPE_INTRANET) - REQUIRED for web UI visibility
+            industry_vertical: Industry vertical (e.g., GENERIC) - REQUIRED with app_type
 
         Returns:
             True if successful, False otherwise
@@ -325,6 +383,24 @@ class AgentSpaceManager:
                 fg=typer.colors.RED,
             )
             return False
+
+        # CRITICAL WARNING: Remind users about app_type requirement
+        # See: https://cloud.google.com/gemini/enterprise/docs/create-app
+        if not app_type:
+            typer.secho(
+                " WARNING: app_type not specified. Apps may not appear in Gemini Enterprise web UI!",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            typer.secho(
+                " RECOMMENDED: Use --app-type APP_TYPE_INTRANET --industry-vertical GENERIC",
+                fg=typer.colors.YELLOW,
+            )
+            typer.secho(
+                " See: https://cloud.google.com/gemini/enterprise/docs/create-app",
+                fg=typer.colors.CYAN,
+            )
+            typer.echo()
 
         # Generate app ID with timestamp
         import time
@@ -348,16 +424,43 @@ class AgentSpaceManager:
             "solutionType": solution_type,
         }
 
-        # Add data stores if provided
-        if data_store_ids:
+        # Add app_type if specified (might help bypass datastore requirement)
+        if app_type:
+            app_config["appType"] = app_type
+            typer.echo(f"  App Type: {app_type}")
+
+        # Add industry_vertical if specified
+        if industry_vertical:
+            app_config["industryVertical"] = industry_vertical
+            typer.echo(f"  Industry Vertical: {industry_vertical}")
+
+        # Handle data stores
+        if skip_datastore:
+            # Explicitly skip data stores for web UI compatibility
+            typer.echo("  Skipping data stores (for web UI compatibility)")
+            if solution_type == "SOLUTION_TYPE_CHAT":
+                typer.secho(
+                    " Note: SOLUTION_TYPE_CHAT typically requires data stores, but creating without them for web UI compatibility",
+                    fg=typer.colors.YELLOW,
+                )
+            if app_type or industry_vertical:
+                typer.echo(
+                    "  Using app_type/industry_vertical which might bypass datastore requirement"
+                )
+        elif data_store_ids:
+            # Add data stores if explicitly provided
             app_config["dataStoreIds"] = data_store_ids
+            typer.echo(f"  Including data stores: {data_store_ids}")
         elif solution_type == "SOLUTION_TYPE_CHAT":
-            # Chat apps require at least one data store
+            # Warn but don't fail for chat apps without data stores
             typer.secho(
-                " Warning: SOLUTION_TYPE_CHAT requires at least one data store",
+                " Warning: SOLUTION_TYPE_CHAT typically requires at least one data store",
                 fg=typer.colors.YELLOW,
             )
-            return False
+            typer.secho(
+                " Creating without data stores. This may help with web UI visibility.",
+                fg=typer.colors.YELLOW,
+            )
 
         # Add chat configuration if enabled
         if enable_chat and solution_type == "SOLUTION_TYPE_CHAT":
@@ -374,6 +477,18 @@ class AgentSpaceManager:
         # Make the API request
         typer.echo(f"  Creating app with ID: {app_id}")
         typer.echo(f"  Solution type: {solution_type}")
+
+        # Show data store status
+        if "dataStoreIds" in app_config:
+            typer.echo(f"  Data stores: {app_config['dataStoreIds']}")
+        else:
+            typer.echo("  Data stores: None (app will be created without data stores)")
+
+        # Debug: Print the config being sent
+        import json as json_lib
+
+        typer.echo("  Config being sent:")
+        typer.echo(json_lib.dumps(app_config, indent=2))
 
         response = self._make_request(
             "POST", url, json=app_config, params={"engineId": app_id}
@@ -395,6 +510,52 @@ class AgentSpaceManager:
             return True
         else:
             typer.secho(" Failed to create app", fg=typer.colors.RED)
+            if response and hasattr(response, "text"):
+                typer.echo(f"  Response: {response.text}")
+            return False
+
+    def delete_app(self, app_id: str, force: bool = False) -> bool:
+        """
+        Delete an AgentSpace app (engine) from Discovery Engine.
+
+        Args:
+            app_id: The app ID to delete
+            force: Skip confirmation prompt
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not force and not typer.confirm(
+            f"Are you sure you want to delete app '{app_id}'?"
+        ):
+            typer.echo("Cancelled.")
+            return False
+
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
+        if not project_number:
+            typer.secho(" Missing GCP_PROJECT_NUMBER in .env", fg=typer.colors.RED)
+            return False
+
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+
+        # Build the API URL for the specific app
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines/{app_id}"
+        )
+
+        typer.echo(f"Deleting app: {app_id}")
+        response = self._make_request("DELETE", url)
+
+        if response and response.status_code in [200, 204]:
+            typer.secho(" App deleted successfully!", fg=typer.colors.GREEN)
+            # Clear from .env if it was the active app
+            if self.env_vars.get("AGENTSPACE_APP_ID") == app_id:
+                self._update_env_var("AGENTSPACE_APP_ID", "")
+                typer.echo("  Cleared AGENTSPACE_APP_ID from .env")
+            return True
+        else:
+            typer.secho(" Failed to delete app", fg=typer.colors.RED)
             if response and hasattr(response, "text"):
                 typer.echo(f"  Response: {response.text}")
             return False
@@ -561,12 +722,11 @@ class AgentSpaceManager:
         Returns:
             True if successful, False otherwise
         """
-        valid, missing = self._validate_environment()
+        valid, errors = self._validate_environment()
         if not valid:
-            typer.echo(
-                f"Error: Missing required environment variables: {', '.join(missing)}",
-                err=True,
-            )
+            typer.secho(" Configuration Error", fg=typer.colors.RED, bold=True)
+            typer.echo()
+            typer.echo(format_validation_errors(errors))
             return False
 
         # Get values from environment if not provided
@@ -814,9 +974,12 @@ class AgentSpaceManager:
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
-    def list_apps(self) -> bool:
+    def list_apps(self, show_raw: bool = True) -> bool:
         """
         List all apps in the AgentSpace collection.
+
+        Args:
+            show_raw: If True, show raw JSON response for debugging
 
         Returns:
             True if successful, False otherwise
@@ -849,6 +1012,13 @@ class AgentSpaceManager:
             result = response.json()
             engines = result.get("engines", [])
 
+            if show_raw:
+                import json as json_lib
+
+                typer.echo("\n=== RAW JSON RESPONSE ===")
+                typer.echo(json_lib.dumps(result, indent=2))
+                typer.echo("=== END RAW JSON ===\n")
+
             if not engines:
                 typer.echo("No apps found in AgentSpace collection.")
                 return True
@@ -872,6 +1042,12 @@ class AgentSpaceManager:
                     typer.echo("   Data Stores: None")
 
                 typer.echo(f"   Create Time: {create_time}")
+
+                if show_raw:
+                    typer.echo("\n   === RAW ENGINE DATA ===")
+                    typer.echo(json_lib.dumps(engine, indent=4))
+                    typer.echo("   === END ENGINE DATA ===")
+
                 typer.echo()
 
             return True
@@ -882,9 +1058,12 @@ class AgentSpaceManager:
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
 
-    def list_agents(self) -> bool:
+    def list_agents(self, show_raw: bool = True) -> bool:
         """
         List all agents in the AgentSpace app.
+
+        Args:
+            show_raw: If True, show raw JSON response for debugging
 
         Returns:
             True if successful, False otherwise
@@ -917,6 +1096,13 @@ class AgentSpaceManager:
 
             result = response.json()
             agents = result.get("agents", [])
+
+            if show_raw:
+                import json as json_lib
+
+                typer.echo("\n=== RAW JSON RESPONSE ===")
+                typer.echo(json_lib.dumps(result, indent=2))
+                typer.echo("=== END RAW JSON ===\n")
 
             if not agents:
                 typer.echo("No agents found in AgentSpace app.")
@@ -960,12 +1146,104 @@ class AgentSpaceManager:
                         f"   Reasoning Engine: {prov_engine['reasoning_engine']}"
                     )
 
+                if show_raw:
+                    typer.echo("\n   === RAW AGENT DATA ===")
+                    typer.echo(json_lib.dumps(agent, indent=4))
+                    typer.echo("   === END AGENT DATA ===")
+
                 typer.echo()
 
             return True
 
         except requests.exceptions.RequestException as e:
             typer.echo(f"Error listing agents: {e}", err=True)
+            if hasattr(e.response, "text"):
+                typer.echo(f"Response: {e.response.text}", err=True)
+            return False
+
+    def get_app_details(self, app_id: str) -> bool:
+        """
+        Get detailed information about a specific app.
+
+        Args:
+            app_id: The ID of the app to get details for
+
+        Returns:
+            True if successful, False otherwise
+        """
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
+        if not project_number:
+            typer.echo("Error: GCP_PROJECT_NUMBER not found in environment", err=True)
+            return False
+
+        access_token = self._get_access_token()
+        if not access_token:
+            typer.echo("Error: Failed to get access token", err=True)
+            return False
+
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+
+        # Build the URL for a specific engine
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines/{app_id}"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "X-Goog-User-Project": project_number,
+        }
+
+        typer.echo(f"\n=== Getting details for app: {app_id} ===\n")
+        typer.echo(f"API URL: {url}\n")
+
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+
+            result = response.json()
+
+            # Display formatted information
+            typer.echo("App Details:")
+            typer.echo(f"  Name: {result.get('name', 'N/A')}")
+            typer.echo(f"  Display Name: {result.get('displayName', 'N/A')}")
+            typer.echo(f"  Solution Type: {result.get('solutionType', 'N/A')}")
+
+            data_store_ids = result.get("dataStoreIds", [])
+            if data_store_ids:
+                typer.echo(f"  Data Stores: {', '.join(data_store_ids)}")
+            else:
+                typer.echo("  Data Stores: None (empty list or field not present)")
+
+            typer.echo(f"  Create Time: {result.get('createTime', 'N/A')}")
+            typer.echo(f"  Update Time: {result.get('updateTime', 'N/A')}")
+
+            # Check for any special fields
+            if "chatEngineConfig" in result:
+                typer.echo("  Chat Engine Config: Present")
+            if "searchEngineConfig" in result:
+                typer.echo("  Search Engine Config: Present")
+            if "commonConfig" in result:
+                typer.echo("  Common Config: Present")
+
+            # Show raw JSON
+            import json as json_lib
+
+            typer.echo("\n=== RAW JSON RESPONSE ===")
+            typer.echo(json_lib.dumps(result, indent=2))
+            typer.echo("=== END RAW JSON ===\n")
+
+            # Check if dataStoreIds field is present but empty vs not present
+            if "dataStoreIds" in result:
+                if not result["dataStoreIds"]:
+                    typer.echo("\nNOTE: dataStoreIds field is present but empty []")
+            else:
+                typer.echo("\nNOTE: dataStoreIds field is NOT present in the response")
+
+            return True
+
+        except requests.exceptions.RequestException as e:
+            typer.echo(f"Error getting app details: {e}", err=True)
             if hasattr(e.response, "text"):
                 typer.echo(f"Response: {e.response.text}", err=True)
             return False
@@ -1225,25 +1503,64 @@ def update_agent_config(
 
 @app.command()
 def list_apps(
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Show raw JSON response for debugging and bug reports.",
+        ),
+    ] = True,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
     ] = Path(".env"),
 ) -> None:
     """List all apps in the AgentSpace collection."""
     manager = AgentSpaceManager(env_file)
-    if not manager.list_apps():
+    if not manager.list_apps(show_raw=raw):
         raise typer.Exit(code=1)
 
 
 @app.command()
 def list_agents(
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Show raw JSON response for debugging and bug reports.",
+        ),
+    ] = True,
     env_file: Annotated[
         Path, typer.Option(help="Path to the environment file.")
     ] = Path(".env"),
 ) -> None:
     """List all agents in the AgentSpace app."""
     manager = AgentSpaceManager(env_file)
-    if not manager.list_agents():
+    if not manager.list_agents(show_raw=raw):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def get_app_details(
+    app_id: Annotated[
+        str,
+        typer.Argument(help="The ID of the app to get details for."),
+    ],
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """
+    Get detailed information about a specific AgentSpace app.
+
+    This command retrieves the raw JSON details for an app, which is useful for
+    debugging and understanding the exact configuration of apps created through
+    different methods (API vs Web UI).
+
+    Example:
+        python manage.py agentspace get-app-details gemini-enterprise-17634710_1763471046296
+    """
+    manager = AgentSpaceManager(env_file)
+    if not manager.get_app_details(app_id):
         raise typer.Exit(code=1)
 
 
@@ -1262,6 +1579,27 @@ def create_app(
         str | None,
         typer.Option("--data-store", help="Data store ID to associate with the app."),
     ] = None,
+    no_datastore: Annotated[
+        bool,
+        typer.Option(
+            "--no-datastore",
+            help="Explicitly create app without data stores (required for web UI visibility).",
+        ),
+    ] = False,
+    app_type: Annotated[
+        str | None,
+        typer.Option(
+            "--app-type",
+            help="App type (e.g., APP_TYPE_INTRANET). REQUIRED for web UI visibility!",
+        ),
+    ] = None,
+    industry_vertical: Annotated[
+        str | None,
+        typer.Option(
+            "--industry-vertical",
+            help="Industry vertical (e.g., GENERIC). REQUIRED with --app-type for web UI visibility!",
+        ),
+    ] = None,
     enable_chat: Annotated[
         bool,
         typer.Option(
@@ -1273,8 +1611,42 @@ def create_app(
         Path, typer.Option(help="Path to the environment file.")
     ] = Path(".env"),
 ) -> None:
-    """Create a new AgentSpace app in Discovery Engine."""
+    """
+    Create a new AgentSpace app in Discovery Engine.
+
+    CRITICAL: For apps to appear in the Gemini Enterprise web UI, you MUST include
+    --app-type APP_TYPE_INTRANET and --industry-vertical GENERIC. Without these,
+    apps will be created successfully but will NOT be visible in the console UI.
+
+    Official documentation: https://cloud.google.com/gemini/enterprise/docs/create-app
+
+    Examples:
+        # RECOMMENDED: Create app with web UI visibility
+        python manage.py agentspace create-app \\
+            --name "My App" \\
+            --type SOLUTION_TYPE_CHAT \\
+            --no-datastore \\
+            --app-type APP_TYPE_INTRANET \\
+            --industry-vertical GENERIC
+
+        # WITHOUT app_type (app will be created but invisible in web UI)
+        python manage.py agentspace create-app --name "My App" --no-datastore
+
+        # Create app with a data store (may not show in web UI)
+        python manage.py agentspace create-app --name "My App" --data-store my-store-id
+    """
     manager = AgentSpaceManager(env_file)
+
+    # Handle conflicting options
+    if no_datastore and data_store_id:
+        typer.secho(
+            " Error: Cannot specify both --no-datastore and --data-store",
+            fg=typer.colors.RED,
+        )
+        typer.echo(
+            "Choose one: either explicitly skip data stores or provide a data store ID"
+        )
+        raise typer.Exit(code=1)
 
     # Convert single data store ID to list if provided
     data_store_ids = [data_store_id] if data_store_id else None
@@ -1284,7 +1656,37 @@ def create_app(
         solution_type=solution_type,
         data_store_ids=data_store_ids,
         enable_chat=enable_chat,
+        skip_datastore=no_datastore,
+        app_type=app_type,
+        industry_vertical=industry_vertical,
     ):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def delete_app(
+    app_id: Annotated[
+        str, typer.Argument(help="App ID to delete (e.g., my-app_1234567890)")
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", help="Force deletion without confirmation.")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """
+    Delete an AgentSpace app (engine) from Discovery Engine.
+
+    Examples:
+        # Delete with confirmation prompt
+        python manage.py agentspace delete-app my-app_1234567890
+
+        # Force delete without confirmation
+        python manage.py agentspace delete-app my-app_1234567890 --force
+    """
+    manager = AgentSpaceManager(env_file)
+    if not manager.delete_app(app_id, force):
         raise typer.Exit(code=1)
 
 

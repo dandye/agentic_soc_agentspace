@@ -60,7 +60,15 @@ This opens an interactive web UI at `http://localhost:8000` where you can test a
 ### Option 2: Production Deployment to Agent Engine
 
 ```bash
-# After completing the setup above, deploy to Agent Engine
+# After completing the setup above:
+
+# 1. Verify Vertex AI setup (one-time verification)
+python manage.py vertex verify
+
+# 2. Configure IAM permissions (one-time setup)
+python manage.py iam setup
+
+# 3. Deploy to Agent Engine
 make agent-engine-deploy
 ```
 
@@ -123,12 +131,81 @@ gcloud services enable securitycenter.googleapis.com  # If using SCC tools
 ```
 
 ### Required IAM Permissions
-Your account needs these roles:
+
+**Your account needs these roles:**
 - `roles/aiplatform.user` - Create and manage AI Platform resources
 - `roles/storage.admin` - Manage staging bucket
 - `roles/iam.serviceAccountUser` - Create service accounts for agent
-- `roles/discoveryengine.admin` - Manage AgentSpace (if using)
+- `roles/discoveryengine.admin` - Manage AgentSpace and register agents (includes agents.manage permission)
 - `roles/securitycenter.admin` - Access Security Command Center (if using)
+
+**IMPORTANT:** The `roles/discoveryengine.admin` role is required to register agents with AgentSpace (provides the `agents.manage` permission). Regular users can use registered agents but cannot register new ones.
+
+#### Service Account Configuration
+
+**Quick Setup (Recommended):**
+
+Use the IAM management CLI to configure all required service account permissions automatically:
+
+```bash
+# Setup all required IAM permissions for AgentSpace
+python manage.py iam setup
+
+# Verify permissions are configured correctly
+python manage.py iam verify
+
+# Preview changes before applying (optional)
+python manage.py iam setup --dry-run --verbose
+```
+
+**What this configures:**
+
+1. **AI Platform Reasoning Engine Service Agent**
+   - Service Account: `service-{PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com`
+   - Role: `roles/aiplatform.user`
+   - Purpose: Query RAG corpus during agent execution
+   - Fixes: `403 PERMISSION_DENIED` error for `aiplatform.ragCorpora.query`
+
+2. **Discovery Engine Service Account**
+   - Service Account: `service-{PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com`
+   - Roles: `roles/aiplatform.user`, `roles/aiplatform.viewer`
+   - Purpose: Call ADK agent from AgentSpace
+   - Fixes: Agent registered but cannot be invoked from Gemini Enterprise UI
+
+**Manual Setup (Alternative):**
+
+If you prefer to configure permissions manually using gcloud:
+
+```bash
+# Get your project number
+GCP_PROJECT_NUMBER=$(gcloud projects describe $GCP_PROJECT_ID --format="value(projectNumber)")
+
+# 1. AI Platform Reasoning Engine Service Agent (for RAG access)
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
+  --member="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-aiplatform-re.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+# 2. Discovery Engine Service Account (for AgentSpace integration)
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
+  --member="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
+  --member="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.viewer"
+```
+
+**Verification:**
+
+You can verify the configuration in the [IAM Console](https://console.cloud.google.com/iam-admin/iam) by checking "Include Google-provided role grants" to view Google-managed service accounts, or use the CLI:
+
+```bash
+# List all roles for a service account
+python manage.py iam list-roles aiplatform-re
+python manage.py iam list-roles discoveryengine
+```
+
+See [Google Cloud IAM Service Agents documentation](https://cloud.google.com/iam/docs/service-agents) for more details about Google-managed service accounts.
 
 ### Authentication Setup
 ```bash
@@ -171,12 +248,30 @@ make agent-engine-deploy
 
 ### 6. Create AgentSpace App (Optional)
 
+**Option A: Using the Web UI (Recommended)**
 1. Navigate to [Google Cloud Console](https://console.cloud.google.com)
 2. Go to **Vertex AI > Search & Conversation > Apps**
 3. Click **Create App**
 4. Select **Agent** as the app type
 5. Configure with your preferred settings
 6. Copy the App ID and add to `.env` as `AGENTSPACE_APP_ID`
+
+**Option B: Using the CLI (Advanced)**
+
+> [!IMPORTANT]
+> **CRITICAL**: When creating apps via the API, you MUST include `--app-type APP_TYPE_INTRANET` and `--industry-vertical GENERIC` for apps to appear in the Gemini Enterprise web UI. Without these fields, apps may be created successfully via API but will not be visible in the console UI.
+>
+> See the [official Google Cloud documentation](https://cloud.google.com/gemini/enterprise/docs/create-app) for details.
+
+```bash
+# Create app with proper visibility settings
+python manage.py agentspace create-app \
+  --name "My Security Agent" \
+  --type SOLUTION_TYPE_CHAT \
+  --no-datastore \
+  --app-type APP_TYPE_INTRANET \
+  --industry-vertical GENERIC
+```
 
 ### 7. Register Agent with AgentSpace
 
@@ -186,7 +281,59 @@ make agentspace-register
 
 ## Deployment Workflow
 
-The deployment process consists of three stages:
+The deployment process consists of four stages:
+
+### Stage 0: Prerequisites Verification and Setup (One-time Setup)
+
+Before deploying, verify and configure your Google Cloud environment:
+
+#### Step 1: Verify Vertex AI Setup
+
+Run the comprehensive verification check:
+
+```bash
+python manage.py vertex verify
+```
+
+This verifies:
+- Environment variables are set correctly
+- Application Default Credentials are configured
+- GCP project is accessible
+- Required APIs are enabled
+- Vertex AI can initialize
+- Your user account has required IAM roles
+
+**If checks fail:**
+```bash
+# Fix authentication
+gcloud auth application-default login
+gcloud auth application-default set-quota-project PROJECT_ID
+
+# Enable required APIs
+python manage.py vertex enable-apis
+
+# Or manually:
+gcloud services enable aiplatform.googleapis.com storage.googleapis.com \
+  cloudbuild.googleapis.com compute.googleapis.com discoveryengine.googleapis.com
+```
+
+#### Step 2: Configure IAM Service Account Permissions
+
+Configure required service account permissions for AgentSpace integration:
+
+```bash
+# Setup IAM permissions (run once per project)
+python manage.py iam setup
+
+# Verify configuration
+python manage.py iam verify
+```
+
+This configures:
+- AI Platform Reasoning Engine Service Agent (for RAG access)
+- Discovery Engine Service Account (for calling agents from AgentSpace)
+
+See [Required IAM Permissions](#required-iam-permissions) for details.
 
 ### Stage 1: Prerequisites (User Configuration)
 Set these variables in your `.env` file before deployment:
@@ -287,13 +434,28 @@ make datastore-create NAME="Security Data" TYPE=SOLUTION_TYPE_SEARCH
 
 ## AgentSpace Integration
 
+> [!IMPORTANT]
+> **APP_TYPE_INTRANET Required**: When creating apps programmatically via the API/CLI, you MUST include `appType=APP_TYPE_INTRANET` and `industryVertical=GENERIC` for apps to be visible in the Gemini Enterprise web UI. Apps created through the console UI include these fields automatically. See the [official documentation](https://cloud.google.com/gemini/enterprise/docs/create-app).
+
+**Option 1: Create via Console (Recommended)**
 1. **Create AgentSpace App** - Via [Console](https://console.cloud.google.com)
    - Navigate to Vertex AI > Search & Conversation > Apps
    - Click **Create App** and select **Agent** type
    - Configure with your preferred settings
    - Note: The agent uses RAG for document retrieval, not Discovery Engine data stores
-
 2. **Copy App ID** to `.env` as `AGENTSPACE_APP_ID`
+
+**Option 2: Create via CLI (Advanced)**
+```bash
+python manage.py agentspace create-app \
+  --name "Security Agent" \
+  --type SOLUTION_TYPE_CHAT \
+  --no-datastore \
+  --app-type APP_TYPE_INTRANET \
+  --industry-vertical GENERIC
+```
+
+**After creating the app:**
 3. **Register agent**: `make agentspace-link-agent` (add OAuth with `make oauth-setup` first if needed)
 4. **Verify**: `make agentspace-verify`
 
@@ -336,6 +498,8 @@ The CLI is organized into subcommand groups:
 python manage.py
 ├── agent-engine    # Manage Agent Engine instances
 ├── agentspace      # Manage AgentSpace apps and agents
+├── vertex          # Verify and manage Vertex AI setup
+├── iam             # Manage IAM permissions for service accounts
 ├── oauth           # Manage OAuth authorizations
 ├── datastore       # Manage data stores
 ├── rag             # Manage RAG corpora
@@ -353,6 +517,14 @@ python manage.py agent-engine delete --index 1
 python manage.py agent-engine delete --resource "projects/.../reasoningEngines/..." --force
 ```
 
+**Vertex AI Setup:**
+```bash
+python manage.py vertex verify              # Verify complete setup
+python manage.py vertex verify --skip-apis  # Skip API checks
+python manage.py vertex enable-apis         # Enable required APIs
+python manage.py vertex check-quota         # Display quota information
+```
+
 **AgentSpace Management:**
 ```bash
 python manage.py agentspace register
@@ -360,6 +532,16 @@ python manage.py agentspace update
 python manage.py agentspace verify
 python manage.py agentspace link-agent
 python manage.py agentspace list-agents
+```
+
+**IAM Permissions Management:**
+```bash
+python manage.py iam setup                    # Configure all required permissions
+python manage.py iam setup --dry-run          # Preview changes without applying
+python manage.py iam setup --verbose          # Show detailed information
+python manage.py iam verify                   # Verify all permissions are configured
+python manage.py iam list-roles aiplatform-re # List roles for AI Platform RE
+python manage.py iam list-roles discoveryengine # List roles for Discovery Engine
 ```
 
 **RAG Corpus Management:**

@@ -54,6 +54,20 @@ python manage.py workflow full-deploy
 python manage.py workflow status
 ```
 
+### Creating AgentSpace Apps
+
+CRITICAL: When creating apps via API/CLI (not console UI), you MUST include --app-type APP_TYPE_INTRANET and --industry-vertical GENERIC for the app to be visible in the Gemini Enterprise web UI. See https://cloud.google.com/gemini/enterprise/docs/create-app
+
+```bash
+# Correct way to create an app via CLI
+python manage.py agentspace create-app \
+  --name "My Agent App" \
+  --type SOLUTION_TYPE_CHAT \
+  --no-datastore \
+  --app-type APP_TYPE_INTRANET \
+  --industry-vertical GENERIC
+```
+
 ### RAG Corpus Management
 
 ```bash
