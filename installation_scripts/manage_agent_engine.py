@@ -186,17 +186,17 @@ class AgentEngineManager:
             if DEBUG:
                 typer.echo(f"Total pages fetched: {page_count}")
 
-            agents_list = agent_list
-
-            if not agents_list:
+            if not agent_list:
                 typer.secho("No Agent Engine instances found.", fg=typer.colors.YELLOW)
                 return []
 
             typer.echo(
-                f"Found {typer.style(str(len(agents_list)), fg=typer.colors.CYAN)} Agent Engine instance(s):\n"
+                f"Found {typer.style(str(len(agent_list)), fg=typer.colors.CYAN)} Agent Engine instance(s):\n"
             )
 
-            for i, agent in enumerate(agents_list, 1):
+            # Build the return list with agent info dictionaries
+            agents_info_list = []
+            for i, agent in enumerate(agent_list, 1):
                 agent_info = {
                     "resource_name": agent.name,
                     "display_name": agent.display_name,
@@ -204,7 +204,7 @@ class AgentEngineManager:
                     "update_time": agent.update_time,
                     "state": agent.state.name if hasattr(agent, "state") else "UNKNOWN",
                 }
-                agent_list.append(agent_info)
+                agents_info_list.append(agent_info)
 
                 typer.secho(f"{i}. {agent.display_name}", fg=typer.colors.CYAN)
                 typer.echo(f"   Resource: {agent.name}")
@@ -228,7 +228,7 @@ class AgentEngineManager:
 
                 typer.echo()
 
-            return agent_list
+            return agents_info_list
 
         except Exception as e:
             typer.secho(f" Error listing agents: {e}", fg=typer.colors.RED)
