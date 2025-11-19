@@ -7,7 +7,6 @@ API enablement, authentication, permissions, and quota status.
 """
 
 import os
-import subprocess
 from pathlib import Path
 from typing import Annotated
 
@@ -16,6 +15,9 @@ import vertexai
 from dotenv import load_dotenv
 from google.auth import default
 from google.auth.exceptions import DefaultCredentialsError
+
+# Import validation utilities
+from installation_scripts.env_validation import is_placeholder_value
 
 
 app = typer.Typer(
@@ -152,31 +154,52 @@ class VertexAIManager:
     def _check_env_vars(self) -> bool:
         """Check required environment variables."""
         required_vars = ["GCP_PROJECT_ID", "GCP_LOCATION"]
-        all_present = True
+        all_valid = True
 
         for var in required_vars:
             value = self.env_vars.get(var)
-            if value:
-                typer.secho(f"  ✓ {var}: {value}", fg=typer.colors.GREEN)
-                if var == "GCP_PROJECT_ID":
-                    self.project_id = value
-                elif var == "GCP_LOCATION":
-                    self.location = value
-            else:
+            if not value:
                 typer.secho(f"  ✗ {var}: Not set", fg=typer.colors.RED)
-                all_present = False
+                all_valid = False
+            else:
+                # Check if it's a placeholder value
+                is_placeholder, reason = is_placeholder_value(var, value)
+                if is_placeholder:
+                    typer.secho(
+                        f"  ✗ {var}: {value} ({reason})",
+                        fg=typer.colors.RED,
+                    )
+                    all_valid = False
+                else:
+                    typer.secho(f"  ✓ {var}: {value}", fg=typer.colors.GREEN)
+                    if var == "GCP_PROJECT_ID":
+                        self.project_id = value
+                    elif var == "GCP_LOCATION":
+                        self.location = value
 
         # Check optional RAG location
         rag_location = self.env_vars.get("RAG_GCP_LOCATION")
         if rag_location:
-            typer.secho(f"  ✓ RAG_GCP_LOCATION: {rag_location}", fg=typer.colors.GREEN)
+            is_placeholder, reason = is_placeholder_value(
+                "RAG_GCP_LOCATION", rag_location
+            )
+            if is_placeholder:
+                typer.secho(
+                    f"  ✗ RAG_GCP_LOCATION: {rag_location} ({reason})",
+                    fg=typer.colors.RED,
+                )
+                all_valid = False
+            else:
+                typer.secho(
+                    f"  ✓ RAG_GCP_LOCATION: {rag_location}", fg=typer.colors.GREEN
+                )
         else:
             typer.secho(
                 "  ℹ RAG_GCP_LOCATION: Not set (will use GCP_LOCATION)",
                 fg=typer.colors.YELLOW,
             )
 
-        return all_present
+        return all_valid
 
     def _check_authentication(self) -> bool:
         """Check if application default credentials are configured."""
@@ -205,43 +228,48 @@ class VertexAIManager:
             return False
 
     def _check_project_access(self) -> bool:
-        """Verify access to the configured GCP project."""
+        """Verify access to the configured GCP project using Python API."""
         try:
-            result = subprocess.run(
-                [
-                    "gcloud",
-                    "projects",
-                    "describe",
-                    self.project_id,
-                    "--format=value(projectId)",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
+            from google.cloud import resourcemanager_v3
+
+            # Create projects client
+            projects_client = resourcemanager_v3.ProjectsClient(
+                credentials=self.credentials
             )
-            if result.returncode == 0:
-                typer.secho(
-                    f"  ✓ Project accessible: {self.project_id}", fg=typer.colors.GREEN
-                )
-                return True
-            else:
-                typer.secho(
-                    f"  ✗ Cannot access project: {self.project_id}", fg=typer.colors.RED
-                )
-                typer.secho(f"    Error: {result.stderr.strip()}", fg=typer.colors.RED)
-                return False
-        except subprocess.TimeoutExpired:
+
+            # Try to get the project
+            project_name = f"projects/{self.project_id}"
+            request = resourcemanager_v3.GetProjectRequest(name=project_name)
+            project = projects_client.get_project(request=request)
+
             typer.secho(
-                "  ⚠ Project check timed out (gcloud may need auth refresh)",
+                f"  ✓ Project accessible: {project.display_name or self.project_id}",
+                fg=typer.colors.GREEN,
+            )
+            return True
+
+        except ImportError:
+            typer.secho(
+                "  ⚠ google-cloud-resource-manager not installed (skipping project check)",
                 fg=typer.colors.YELLOW,
             )
-            return True  # Don't fail on timeout, credentials might still work
-        except FileNotFoundError:
+            return True
+        except Exception as e:
             typer.secho(
-                "  ⚠ gcloud CLI not found (skipping project check)",
-                fg=typer.colors.YELLOW,
+                f"  ✗ Cannot access project: {self.project_id}", fg=typer.colors.RED
             )
-            return True  # Don't fail if gcloud not installed
+            typer.secho(f"    Error: {str(e)}", fg=typer.colors.RED)
+            typer.echo()
+            typer.echo("  To fix, ensure:")
+            typer.echo("    1. Credentials are valid and not expired:")
+            typer.secho(
+                "       gcloud auth application-default login", fg=typer.colors.YELLOW
+            )
+            typer.echo("    2. Project ID is correct in .env")
+            typer.echo(
+                f"    3. You have access to project '{self.project_id}' with current credentials"
+            )
+            return False
 
     def _check_apis(self) -> bool:
         """Check if required APIs are enabled."""
@@ -265,25 +293,33 @@ class VertexAIManager:
         return all_enabled
 
     def _is_api_enabled(self, api: str) -> bool:
-        """Check if a specific API is enabled."""
+        """Check if a specific API is enabled using Python API."""
         try:
-            result = subprocess.run(
-                [
-                    "gcloud",
-                    "services",
-                    "list",
-                    "--enabled",
-                    f"--filter=name:{api}",
-                    "--format=value(name)",
-                    f"--project={self.project_id}",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
+            from googleapiclient import discovery
+
+            # Create service usage client using google-api-python-client
+            service = discovery.build(
+                "serviceusage",
+                "v1",
+                credentials=self.credentials,
+                cache_discovery=False,
             )
-            return api in result.stdout
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return True  # Assume enabled if we can't check
+
+            # Build the service name
+            service_name = f"projects/{self.project_id}/services/{api}"
+
+            # Get the service state
+            result = service.services().get(name=service_name).execute()
+
+            # Check if service is enabled
+            return result.get("state") == "ENABLED"
+
+        except ImportError:
+            # Fallback to assuming enabled if library not available
+            return True
+        except Exception:
+            # If we can't check (API error, not found, etc), assume not enabled
+            return False
 
     def _check_vertex_ai_init(self) -> bool:
         """Test Vertex AI initialization."""
@@ -304,77 +340,132 @@ class VertexAIManager:
             )
             return False
 
-    def _check_permissions(self) -> None:
-        """Check IAM permissions (informational only)."""
-        typer.echo("  Checking IAM permissions...")
-        typer.echo("  Note: This requires gcloud CLI and may need fresh credentials")
-        typer.echo()
-
+    def _check_permissions(self) -> bool:
+        """Check IAM permissions using Python library."""
         try:
-            # Get current user email
-            result = subprocess.run(
-                ["gcloud", "config", "get-value", "account"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            user_email = result.stdout.strip()
-            if not user_email:
+            from google.cloud import resourcemanager_v3
+            from google.iam.v1 import iam_policy_pb2
+
+            typer.echo("  Checking IAM permissions...")
+
+            # Get current user identity from credentials
+            if not self.credentials:
                 typer.secho(
-                    "  ℹ Unable to determine current user", fg=typer.colors.YELLOW
+                    "  ⚠ No credentials available to check permissions",
+                    fg=typer.colors.YELLOW,
                 )
-                return
+                return True
 
-            typer.echo(f"  Current user: {user_email}")
-            typer.echo(f"  Required roles: {', '.join(self.REQUIRED_ROLES)}")
-            typer.echo()
-            typer.secho(
-                "  Note: Use GCP Console IAM page to verify permissions",
-                fg=typer.colors.CYAN,
+            # Try to get user email from credentials
+            user_email = None
+            if hasattr(self.credentials, "service_account_email"):
+                user_email = self.credentials.service_account_email
+            elif hasattr(self.credentials, "id_token"):
+                # For user credentials, try to extract email from token
+                try:
+                    import base64
+                    import json
+
+                    # ID tokens are JWT format: header.payload.signature
+                    token_parts = self.credentials.id_token.split(".")
+                    if len(token_parts) >= 2:
+                        # Decode payload (add padding if needed)
+                        payload = token_parts[1]
+                        payload += "=" * (4 - len(payload) % 4)
+                        decoded = json.loads(base64.b64decode(payload))
+                        user_email = decoded.get("email")
+                except Exception as e:
+                    # Silently ignore token parsing errors, fallback to gcloud
+                    _ = e  # Suppress unused variable warning
+                    pass
+
+            if user_email:
+                typer.echo(f"  Current user: {user_email}")
+            else:
+                typer.echo("  Current user: (authenticated, unable to determine email)")
+
+            # Get IAM policy for the project
+            projects_client = resourcemanager_v3.ProjectsClient(
+                credentials=self.credentials
             )
+            request = iam_policy_pb2.GetIamPolicyRequest(
+                resource=f"projects/{self.project_id}"
+            )
+            policy = projects_client.get_iam_policy(request=request)
 
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+            # Build member identifier
+            member_identifiers = []
+            if user_email:
+                member_identifiers.append(f"user:{user_email}")
+                # Also check for serviceAccount format
+                if "@" in user_email and ".iam.gserviceaccount.com" in user_email:
+                    member_identifiers.append(f"serviceAccount:{user_email}")
+
+            # Check if user has required roles
+            user_roles = set()
+            for binding in policy.bindings:
+                for member in binding.members:
+                    if any(member == mid for mid in member_identifiers):
+                        user_roles.add(binding.role)
+
+            # Check required roles
+            all_roles_present = True
+            typer.echo()
+            typer.echo("  Required roles:")
+            for role in self.REQUIRED_ROLES:
+                if role in user_roles:
+                    typer.secho(f"    ✓ {role}", fg=typer.colors.GREEN)
+                else:
+                    typer.secho(f"    ✗ {role} (not granted)", fg=typer.colors.RED)
+                    all_roles_present = False
+
+            if not all_roles_present:
+                typer.echo()
+                typer.echo("  To grant required roles, run:")
+                if user_email:
+                    for role in self.REQUIRED_ROLES:
+                        if role not in user_roles:
+                            typer.secho(
+                                f"    gcloud projects add-iam-policy-binding {self.project_id} \\\n"
+                                f"      --member='user:{user_email}' \\\n"
+                                f"      --role='{role}'",
+                                fg=typer.colors.YELLOW,
+                            )
+
+            return all_roles_present
+
+        except ImportError:
             typer.secho(
-                "  ℹ Could not check permissions (gcloud CLI issue)",
+                "  ⚠ google-cloud-resource-manager not installed (skipping permission check)",
                 fg=typer.colors.YELLOW,
             )
+            return True
+        except Exception as e:
+            typer.secho(f"  ⚠ Could not check permissions: {e}", fg=typer.colors.YELLOW)
+            typer.echo(
+                "    Note: Use GCP Console IAM page to verify permissions manually"
+            )
+            return True
 
     def enable_apis(self) -> bool:
-        """Enable all required APIs."""
-        typer.echo(f"Enabling required APIs for project: {self.project_id}")
+        """Display command to enable required APIs."""
+        typer.echo(f"To enable required APIs for project: {self.project_id}")
         typer.echo()
 
         apis_to_enable = self.REQUIRED_APIS.copy()
+        cmd = f"gcloud services enable {' '.join(apis_to_enable)} --project={self.project_id}"
 
-        try:
-            cmd = (
-                ["gcloud", "services", "enable"]
-                + apis_to_enable
-                + [f"--project={self.project_id}"]
-            )
-            typer.echo(f"Running: {' '.join(cmd)}")
-            typer.echo()
+        typer.echo("Run this command:")
+        typer.secho(f"  {cmd}", fg=typer.colors.YELLOW)
+        typer.echo()
+        typer.echo("Or enable APIs via the Cloud Console:")
+        typer.echo(
+            f"  https://console.cloud.google.com/apis/library?project={self.project_id}"
+        )
+        typer.echo()
+        typer.echo("Note: It may take a few minutes for APIs to be fully active")
 
-            result = subprocess.run(cmd, timeout=120)
-
-            if result.returncode == 0:
-                typer.secho("✓ APIs enabled successfully", fg=typer.colors.GREEN)
-                typer.echo()
-                typer.echo(
-                    "Note: It may take a few minutes for APIs to be fully active"
-                )
-                return True
-            else:
-                typer.secho("✗ Failed to enable APIs", fg=typer.colors.RED)
-                return False
-
-        except subprocess.TimeoutExpired:
-            typer.secho("✗ Command timed out", fg=typer.colors.RED)
-            return False
-        except FileNotFoundError:
-            typer.secho("✗ gcloud CLI not found", fg=typer.colors.RED)
-            typer.echo("Please install the Google Cloud SDK")
-            return False
+        return True
 
 
 @app.command()

@@ -842,16 +842,18 @@ class AgentEngineManager:
                     bold=True,
                 )
                 try:
-                    # Use gcloud auth to get access token
-                    import subprocess
+                    # Get access token from credentials
+                    from google.auth import default
+                    from google.auth.transport import requests as auth_requests
 
-                    result = subprocess.run(
-                        ["gcloud", "auth", "print-access-token"],
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                    )
-                    access_token = result.stdout.strip()
+                    credentials, _ = default()
+
+                    # Ensure credentials are refreshed
+                    if not credentials.valid:
+                        request = auth_requests.Request()
+                        credentials.refresh(request)
+
+                    access_token = credentials.token
 
                     # Make REST API call
                     import requests

@@ -135,10 +135,41 @@ class AgentSpaceManager:
         }
         headers.update(kwargs.pop("headers", {}))
 
+        # Add default timeout if not specified (60 seconds)
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = 60
+
+        # Debug output
+        debug = self.env_vars.get("DEBUG", "").lower() in ["true", "1", "yes"]
+        if debug:
+            typer.echo(f"DEBUG: {method} {url}")
+            if "json" in kwargs:
+                import json as json_lib
+
+                typer.echo(
+                    f"DEBUG: Request body: {json_lib.dumps(kwargs['json'], indent=2)}"
+                )
+            typer.echo(f"DEBUG: Timeout: {kwargs['timeout']}s")
+
         try:
+            typer.echo(f"  Sending {method} request to API...")
             response = requests.request(method, url, headers=headers, **kwargs)
+            if debug:
+                typer.echo(f"DEBUG: Response status: {response.status_code}")
+                typer.echo(f"DEBUG: Response body: {response.text[:500]}")
             response.raise_for_status()
+            typer.echo(f"  API response received (status {response.status_code})")
             return response
+        except requests.exceptions.Timeout:
+            typer.secho(
+                f" API request timed out after {kwargs['timeout']}s",
+                fg=typer.colors.RED,
+            )
+            typer.secho(
+                "  CHAT apps may take longer to create (requires Dialogflow setup)",
+                fg=typer.colors.YELLOW,
+            )
+            return None
         except requests.exceptions.RequestException as e:
             typer.secho(f" API request failed: {e}", fg=typer.colors.RED)
             if e.response is not None:
@@ -284,9 +315,11 @@ class AgentSpaceManager:
             return True
         return False
 
-    def delete_agent(self, force: bool = False) -> bool:
+    def delete_agent(self, force: bool = False, agent_id: str | None = None) -> bool:
         """Delete agent from AgentSpace."""
-        agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
+        if not agent_id:
+            agent_id = self.env_vars.get("AGENTSPACE_AGENT_ID")
+
         if not agent_id:
             typer.secho(" No agent registered to delete.", fg=typer.colors.RED)
             return True
@@ -301,7 +334,9 @@ class AgentSpaceManager:
         response = self._make_request("DELETE", api_url)
         if response and response.status_code in [200, 204]:
             typer.secho(" Agent deleted successfully!", fg=typer.colors.GREEN)
-            self._update_env_var("AGENTSPACE_AGENT_ID", "")
+            # Only clear env var if we deleted the agent that was in .env
+            if agent_id == self.env_vars.get("AGENTSPACE_AGENT_ID"):
+                self._update_env_var("AGENTSPACE_AGENT_ID", "")
             return True
         return False
 
@@ -475,6 +510,52 @@ class AgentSpaceManager:
             return True
         else:
             typer.secho(" Failed to create app", fg=typer.colors.RED)
+            if response and hasattr(response, "text"):
+                typer.echo(f"  Response: {response.text}")
+            return False
+
+    def delete_app(self, app_id: str, force: bool = False) -> bool:
+        """
+        Delete an AgentSpace app (engine) from Discovery Engine.
+
+        Args:
+            app_id: The app ID to delete
+            force: Skip confirmation prompt
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not force and not typer.confirm(
+            f"Are you sure you want to delete app '{app_id}'?"
+        ):
+            typer.echo("Cancelled.")
+            return False
+
+        project_number = self.env_vars.get("GCP_PROJECT_NUMBER")
+        if not project_number:
+            typer.secho(" Missing GCP_PROJECT_NUMBER in .env", fg=typer.colors.RED)
+            return False
+
+        collection = self.env_vars.get("AGENTSPACE_COLLECTION", "default_collection")
+
+        # Build the API URL for the specific app
+        url = (
+            f"{DISCOVERY_ENGINE_API_BASE}/projects/{project_number}/"
+            f"locations/global/collections/{collection}/engines/{app_id}"
+        )
+
+        typer.echo(f"Deleting app: {app_id}")
+        response = self._make_request("DELETE", url)
+
+        if response and response.status_code in [200, 204]:
+            typer.secho(" App deleted successfully!", fg=typer.colors.GREEN)
+            # Clear from .env if it was the active app
+            if self.env_vars.get("AGENTSPACE_APP_ID") == app_id:
+                self._update_env_var("AGENTSPACE_APP_ID", "")
+                typer.echo("  Cleared AGENTSPACE_APP_ID from .env")
+            return True
+        else:
+            typer.secho(" Failed to delete app", fg=typer.colors.RED)
             if response and hasattr(response, "text"):
                 typer.echo(f"  Response: {response.text}")
             return False
@@ -1579,6 +1660,33 @@ def create_app(
         app_type=app_type,
         industry_vertical=industry_vertical,
     ):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def delete_app(
+    app_id: Annotated[
+        str, typer.Argument(help="App ID to delete (e.g., my-app_1234567890)")
+    ],
+    force: Annotated[
+        bool, typer.Option("--force", help="Force deletion without confirmation.")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """
+    Delete an AgentSpace app (engine) from Discovery Engine.
+
+    Examples:
+        # Delete with confirmation prompt
+        python manage.py agentspace delete-app my-app_1234567890
+
+        # Force delete without confirmation
+        python manage.py agentspace delete-app my-app_1234567890 --force
+    """
+    manager = AgentSpaceManager(env_file)
+    if not manager.delete_app(app_id, force):
         raise typer.Exit(code=1)
 
 
