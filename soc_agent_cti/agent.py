@@ -38,6 +38,7 @@ from pathlib import Path
 import vertexai
 from dotenv import load_dotenv
 from google.adk.agents import Agent
+from google.adk.tools import AgentTool, google_search
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.retrieval.vertex_ai_rag_retrieval import VertexAiRagRetrieval
@@ -389,6 +390,11 @@ def create_agent():
         tools.append(ask_vertex_retrieval)
     else:
         logger.warning("RAG_CORPUS_ID not configured, skipping RAG retrieval tool")
+
+    # ========================================================================
+    # Add google_search as an AgentTool
+    # ========================================================================
+    tools.append(AgentTool(agent=google_search))
 
     # ========================================================================
     # Create the Agent with all configured tools
