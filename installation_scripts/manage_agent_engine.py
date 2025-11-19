@@ -23,10 +23,21 @@ from google.api_core import client_options
 from google.cloud import aiplatform
 from google.cloud.aiplatform_v1beta1 import (
     DeleteReasoningEngineRequest,
+    ListReasoningEnginesRequest,
     ReasoningEngineServiceClient,
 )
 from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
+
+
+# Import Discovery Engine client for Agent Builder assistants
+try:
+    from google.cloud import discoveryengine_v1 as discoveryengine
+except ImportError:
+    discoveryengine = None
+    logging.warning(
+        "Discovery Engine client library not available. Install with: pip install google-cloud-discoveryengine"
+    )
 
 
 # Import SOC Agent package
@@ -34,6 +45,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Additional imports for deployment
 import importlib
 import shutil
+
+# Import validation utilities
+from installation_scripts.env_validation import (
+    format_validation_errors,
+    validate_env_vars,
+    validate_file_path_exists,
+)
 
 
 app = typer.Typer(
@@ -125,10 +143,50 @@ class AgentEngineManager:
             client = ReasoningEngineServiceClient(client_options=client_opts)
 
             parent = f"projects/{self.project}/locations/{self.location}"
-            agents = client.list_reasoning_engines(parent=parent)
+
+            # Use explicit pagination to avoid infinite loops
+            # Set a reasonable page size to prevent excessive API calls
+            request = ListReasoningEnginesRequest(
+                parent=parent,
+                page_size=100,  # Reasonable limit per page
+                page_token="",  # Start from first page
+            )
 
             agent_list = []
-            agents_list = list(agents)
+            page_count = 0
+            max_pages = 50  # Safety limit to prevent infinite pagination
+
+            # Manually iterate through pages with safety limits
+            while True:
+                page_count += 1
+                if page_count > max_pages:
+                    typer.secho(
+                        f"\nWarning: Reached maximum page limit ({max_pages}). "
+                        "There may be more agents not shown.",
+                        fg=typer.colors.YELLOW,
+                    )
+                    break
+
+                if DEBUG:
+                    typer.echo(f"Fetching page {page_count}...")
+
+                response = client.list_reasoning_engines(request=request)
+
+                # Add agents from this page
+                for agent in response.reasoning_engines:
+                    agent_list.append(agent)
+
+                # Check if there are more pages
+                if not response.next_page_token:
+                    break
+
+                # Update request for next page
+                request.page_token = response.next_page_token
+
+            if DEBUG:
+                typer.echo(f"Total pages fetched: {page_count}")
+
+            agents_list = agent_list
 
             if not agents_list:
                 typer.secho("No Agent Engine instances found.", fg=typer.colors.YELLOW)
@@ -174,6 +232,212 @@ class AgentEngineManager:
 
         except Exception as e:
             typer.secho(f" Error listing agents: {e}", fg=typer.colors.RED)
+            return []
+
+    def list_assistants(
+        self,
+        engine_id: str = None,
+        collection_id: str = "default_collection",
+        verbose: bool = False,
+    ) -> list[dict]:
+        """
+        List assistants from Discovery Engine/Agent Builder.
+
+        Args:
+            engine_id: The engine/app ID to list assistants for. If not provided, will list all engines first.
+            collection_id: The collection ID (default: "default_collection")
+            verbose: Show detailed information for each assistant
+
+        Returns:
+            List of assistant information dictionaries
+        """
+        if not discoveryengine:
+            typer.secho(
+                " Discovery Engine client library not installed.", fg=typer.colors.RED
+            )
+            typer.echo("Install with: pip install google-cloud-discoveryengine")
+            return []
+
+        typer.echo("\n" + "=" * 80)
+        typer.secho("Listing Agent Builder Assistants", fg=typer.colors.BLUE, bold=True)
+        typer.echo("=" * 80 + "\n")
+
+        try:
+            # If no engine_id provided, first list available engines
+            if not engine_id:
+                typer.secho(
+                    "No engine ID specified. Listing available engines first...",
+                    fg=typer.colors.YELLOW,
+                )
+                engines = self.list_engines(collection_id=collection_id)
+                if not engines:
+                    typer.secho(
+                        "No engines found. Please create an engine first.",
+                        fg=typer.colors.YELLOW,
+                    )
+                    return []
+
+                # Let user select an engine
+                typer.echo("\nAvailable engines:")
+                for i, engine in enumerate(engines, 1):
+                    typer.echo(
+                        f"{i}. {engine['name'].split('/')[-1]} - {engine.get('display_name', 'No display name')}"
+                    )
+
+                # For now, we'll just return and ask user to specify engine_id
+                typer.secho(
+                    "\nPlease specify an engine ID to list its assistants.",
+                    fg=typer.colors.YELLOW,
+                )
+                return []
+
+            # Create Discovery Engine client
+            client = discoveryengine.ConversationalSearchServiceClient()
+
+            # Construct parent path
+            parent = f"projects/{self.project}/locations/{self.location}/collections/{collection_id}/engines/{engine_id}"
+
+            typer.echo(f"Listing assistants for engine: {parent}")
+
+            # Create request to list assistants
+            request = discoveryengine.ListConversationsRequest(
+                parent=parent,
+                page_size=100,  # Reasonable limit per page
+            )
+
+            assistant_list = []
+            page_count = 0
+            max_pages = 50  # Safety limit
+
+            # Paginate through results
+            while True:
+                page_count += 1
+                if page_count > max_pages:
+                    typer.secho(
+                        f"\nWarning: Reached maximum page limit ({max_pages}). "
+                        "There may be more assistants not shown.",
+                        fg=typer.colors.YELLOW,
+                    )
+                    break
+
+                if DEBUG:
+                    typer.echo(f"Fetching page {page_count}...")
+
+                # Note: The actual method name might be list_conversations or similar
+                # depending on the Discovery Engine API version
+                try:
+                    response = client.list_conversations(request=request)
+                except AttributeError:
+                    # Try alternative method names
+                    typer.secho(
+                        " API method not found. The Discovery Engine API may have changed.",
+                        fg=typer.colors.RED,
+                    )
+                    return []
+
+                # Add assistants from this page
+                for conversation in response.conversations:
+                    assistant_info = {
+                        "name": conversation.name,
+                        "display_name": getattr(conversation, "display_name", "N/A"),
+                        "state": getattr(conversation, "state", "UNKNOWN"),
+                        "start_time": getattr(conversation, "start_time", None),
+                        "end_time": getattr(conversation, "end_time", None),
+                    }
+                    assistant_list.append(assistant_info)
+
+                # Check if there are more pages
+                if not response.next_page_token:
+                    break
+
+                # Update request for next page
+                request.page_token = response.next_page_token
+
+            if DEBUG:
+                typer.echo(f"Total pages fetched: {page_count}")
+
+            if not assistant_list:
+                typer.secho(
+                    f"No assistants found in engine: {engine_id}",
+                    fg=typer.colors.YELLOW,
+                )
+                return []
+
+            typer.echo(
+                f"Found {typer.style(str(len(assistant_list)), fg=typer.colors.CYAN)} assistant(s):\n"
+            )
+
+            for i, assistant in enumerate(assistant_list, 1):
+                typer.secho(f"{i}. {assistant['display_name']}", fg=typer.colors.CYAN)
+                typer.echo(f"   Resource: {assistant['name']}")
+                typer.echo(f"   State: {assistant['state']}")
+
+                if verbose:
+                    if assistant["start_time"]:
+                        typer.echo(f"   Start Time: {assistant['start_time']}")
+                    if assistant["end_time"]:
+                        typer.echo(f"   End Time: {assistant['end_time']}")
+
+                typer.echo()
+
+            return assistant_list
+
+        except Exception as e:
+            typer.secho(f" Error listing assistants: {e}", fg=typer.colors.RED)
+            if DEBUG:
+                import traceback
+
+                typer.echo(traceback.format_exc())
+            return []
+
+    def list_engines(self, collection_id: str = "default_collection") -> list[dict]:
+        """
+        List Discovery Engine engines/apps.
+
+        Args:
+            collection_id: The collection ID (default: "default_collection")
+
+        Returns:
+            List of engine information dictionaries
+        """
+        if not discoveryengine:
+            typer.secho(
+                " Discovery Engine client library not installed.", fg=typer.colors.RED
+            )
+            return []
+
+        try:
+            # Create Discovery Engine client for engines
+            client = discoveryengine.EngineServiceClient()
+
+            # Construct parent path for engines
+            parent = f"projects/{self.project}/locations/{self.location}/collections/{collection_id}"
+
+            # Create request to list engines
+            request = discoveryengine.ListEnginesRequest(
+                parent=parent,
+                page_size=100,
+            )
+
+            engines_list = []
+
+            # Get first page of results
+            response = client.list_engines(request=request)
+
+            for engine in response.engines:
+                engine_info = {
+                    "name": engine.name,
+                    "display_name": getattr(engine, "display_name", "N/A"),
+                    "solution_type": getattr(engine, "solution_type", "UNKNOWN"),
+                    "create_time": getattr(engine, "create_time", None),
+                }
+                engines_list.append(engine_info)
+
+            return engines_list
+
+        except Exception as e:
+            if DEBUG:
+                typer.secho(f" Error listing engines: {e}", fg=typer.colors.RED)
             return []
 
     def delete_agent(self, resource_name: str, force: bool = False) -> bool:
@@ -304,12 +568,12 @@ class AgentEngineManager:
                 "RAG_CORPUS_ID",
             ]
 
-            missing_vars = [var for var in required_vars if not os.environ.get(var)]
-            if missing_vars:
-                typer.secho(
-                    f" Missing required environment variables: {', '.join(missing_vars)}",
-                    fg=typer.colors.RED,
-                )
+            # Check for missing or placeholder values
+            is_valid, errors = validate_env_vars(required_vars)
+            if not is_valid:
+                typer.secho(" Configuration Error", fg=typer.colors.RED, bold=True)
+                typer.echo()
+                typer.echo(format_validation_errors(errors))
                 return None
 
             # Validate RAG_CORPUS_ID format
@@ -347,6 +611,16 @@ class AgentEngineManager:
                 "CHRONICLE_SERVICE_ACCOUNT_PATH"
             )
             if CHRONICLE_SERVICE_ACCOUNT_PATH:
+                # Validate the service account file path exists and is not a placeholder
+                file_error = validate_file_path_exists(
+                    "CHRONICLE_SERVICE_ACCOUNT_PATH", CHRONICLE_SERVICE_ACCOUNT_PATH
+                )
+                if file_error:
+                    typer.secho(" Configuration Error", fg=typer.colors.RED, bold=True)
+                    typer.echo()
+                    typer.echo(format_validation_errors([file_error]))
+                    return None
+
                 dest_dir = Path("./mcp-security/server/secops/secops_mcp/")
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy(CHRONICLE_SERVICE_ACCOUNT_PATH, dest_dir)
@@ -899,6 +1173,125 @@ def inspect(
 
     if not success:
         raise typer.Exit(code=1)
+
+
+@app.command("list-assistants")
+def list_assistants(
+    engine_id: Annotated[
+        str | None,
+        typer.Option(
+            "--engine",
+            "-e",
+            help="Engine/App ID to list assistants for. If not provided, lists available engines.",
+        ),
+    ] = None,
+    collection: Annotated[
+        str,
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection ID (default: default_collection)",
+        ),
+    ] = "default_collection",
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show detailed information.")
+    ] = False,
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """
+    List assistants from Discovery Engine/Agent Builder.
+
+    This uses the Google Cloud Generative AI App Builder API to list assistants
+    within a specified engine (app). If no engine ID is provided, it will first
+    list available engines to help you choose one.
+
+    Example:
+        python manage_agent_engine.py list-assistants --engine my-engine-id
+    """
+    manager = AgentEngineManager(env_file)
+    assistants = manager.list_assistants(
+        engine_id=engine_id, collection_id=collection, verbose=verbose
+    )
+
+    if not assistants and engine_id:
+        typer.secho(
+            f"\nNo assistants found for engine '{engine_id}'.", fg=typer.colors.YELLOW
+        )
+        typer.echo("You may need to create assistants first or verify the engine ID.")
+
+
+@app.command("list-engines")
+def list_engines(
+    collection: Annotated[
+        str,
+        typer.Option(
+            "--collection",
+            "-c",
+            help="Collection ID (default: default_collection)",
+        ),
+    ] = "default_collection",
+    env_file: Annotated[
+        Path, typer.Option(help="Path to the environment file.")
+    ] = Path(".env"),
+) -> None:
+    """
+    List Discovery Engine engines/apps.
+
+    This uses the Google Cloud Discovery Engine API to list all engines (apps)
+    within a collection. These engines can contain assistants that can be listed
+    using the 'list-assistants' command.
+
+    Example:
+        python manage_agent_engine.py list-engines
+    """
+    manager = AgentEngineManager(env_file)
+
+    if not discoveryengine:
+        typer.secho(
+            " Discovery Engine client library not installed.", fg=typer.colors.RED
+        )
+        typer.echo("\nTo install, run:")
+        typer.echo("  pip install google-cloud-discoveryengine")
+        raise typer.Exit(code=1)
+
+    typer.echo("\n" + "=" * 80)
+    typer.secho(
+        "Listing Discovery Engine Engines/Apps", fg=typer.colors.BLUE, bold=True
+    )
+    typer.echo("=" * 80 + "\n")
+
+    engines = manager.list_engines(collection_id=collection)
+
+    if not engines:
+        typer.secho(
+            "No engines found in the specified collection.", fg=typer.colors.YELLOW
+        )
+        typer.echo(f"Collection: {collection}")
+        typer.echo("\nYou may need to:")
+        typer.echo("  1. Create an engine in the Google Cloud Console")
+        typer.echo("  2. Verify the collection ID")
+        typer.echo("  3. Ensure you have the necessary permissions")
+    else:
+        typer.echo(
+            f"Found {typer.style(str(len(engines)), fg=typer.colors.CYAN)} engine(s):\n"
+        )
+
+        for i, engine in enumerate(engines, 1):
+            engine_id = engine["name"].split("/")[-1]
+            typer.secho(f"{i}. {engine_id}", fg=typer.colors.CYAN)
+            typer.echo(f"   Display Name: {engine['display_name']}")
+            typer.echo(f"   Solution Type: {engine['solution_type']}")
+            typer.echo(f"   Full Name: {engine['name']}")
+            if engine["create_time"]:
+                typer.echo(f"   Created: {engine['create_time']}")
+            typer.echo()
+
+        typer.secho("\nTo list assistants for an engine:", fg=typer.colors.GREEN)
+        typer.echo(
+            "  python manage_agent_engine.py list-assistants --engine <ENGINE_ID>"
+        )
 
 
 if __name__ == "__main__":
