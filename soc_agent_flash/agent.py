@@ -266,8 +266,8 @@ def create_agent():
     logger.info(f"Creating SOC Agent with {len(tools)} tools...")
 
     agent = Agent(
-        model="gemini-2.5-flash",
-        name="soc_assistant_flash",
+        model="gemini-3.0-flash",
+        name="soc_assistant_flash_3",
         description="Security Operations reasoning agent with access to Agentic SOC MCP tools and runbook search.",
         instruction="""You are a Security Operations assistant with comprehensive access to MCP security tools including RAG-based runbook and documentation retrieval.
 
