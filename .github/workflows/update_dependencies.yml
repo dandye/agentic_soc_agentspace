@@ -22,12 +22,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Update requirements.in and compile requirements.txt
+      - name: Upgrade requirements.in
+        id: upgrade
+        run: |
+          pip-upgrade requirements.in
+
+      - name: Compile requirements.txt
         id: compile
         run: |
-          pip-compile --upgrade requirements.in
+          pip-compile requirements.in
+
+      - name: Check for changes in requirements.in
+        id: check_changes
+        run: |
+          git diff --exit-code requirements.in || echo "changes_exist=true" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
+        if: steps.check_changes.outputs.changes_exist == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -39,3 +50,6 @@ jobs:
             - Re-compiles `requirements.txt` from the updated `requirements.in`.
           branch: "chore/update-python-dependencies"
           delete-branch: true
+          add-paths: |
+            requirements.in
+            requirements.txt
