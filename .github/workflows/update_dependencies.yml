@@ -32,24 +32,32 @@ jobs:
         run: |
           pip-compile requirements.in
 
-      - name: Check for changes in requirements.in
+      - name: Check for changes
         id: check_changes
         run: |
-          git diff --exit-code requirements.in || echo "changes_exist=true" >> $GITHUB_OUTPUT
+          git diff --quiet requirements.in || echo "req_in_changed=true" >> $GITHUB_OUTPUT
 
-      - name: Create Pull Request
-        if: steps.check_changes.outputs.changes_exist == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(deps): update python dependencies"
-          title: "Update Python Dependencies"
-          body: |
-            This PR updates the Python dependencies based on the latest versions available.
-            - Updates `requirements.in` with the latest package versions.
-            - Re-compiles `requirements.txt` from the updated `requirements.in`.
-          branch: "chore/update-python-dependencies"
-          delete-branch: true
-          add-paths: |
-            requirements.in
-            requirements.txt
+      - name: Setup Git and Create Pull Request
+        if: steps.check_changes.outputs.req_in_changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="chore/update-python-dependencies-$(date +%Y%m%d%H%M%S)"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b $BRANCH_NAME
+          git add requirements.in requirements.txt
+          git commit -m "chore(deps): update python dependencies"
+          git push -u origin $BRANCH_NAME
+
+          PR_BODY_FILE=$(mktemp)
+          echo 'This PR updates the Python dependencies based on the latest versions available.' > $PR_BODY_FILE
+          echo '- Updates `requirements.in` with the latest package versions.' >> $PR_BODY_FILE
+          echo '- Re-compiles `requirements.txt` from the updated `requirements.in`.' >> $PR_BODY_FILE
+
+          gh pr create \
+            --title "Update Python Dependencies" \
+            --body-file $PR_BODY_FILE \
+            --base main \
+            --head $BRANCH_NAME
+          rm $PR_BODY_FILE
