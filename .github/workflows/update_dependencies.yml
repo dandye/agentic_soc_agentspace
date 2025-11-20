@@ -1,0 +1,41 @@
+name: Update Python Dependencies
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Update requirements.in and compile requirements.txt
+        id: compile
+        run: |
+          pip-compile --upgrade requirements.in
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(deps): update python dependencies"
+          title: "Update Python Dependencies"
+          body: |
+            This PR updates the Python dependencies based on the latest versions available.
+            - Updates `requirements.in` with the latest package versions.
+            - Re-compiles `requirements.txt` from the updated `requirements.in`.
+          branch: "chore/update-python-dependencies"
+          delete-branch: true

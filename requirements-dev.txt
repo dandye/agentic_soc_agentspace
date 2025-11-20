@@ -6,3 +6,4 @@ pip-audit
 pytest
 pytest-cov
 ruff
+pip-tools
