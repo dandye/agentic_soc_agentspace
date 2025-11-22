@@ -8,6 +8,7 @@ on:
       - 'pyproject.toml'
       - 'requirements-dev.txt'
       - 'requirements.txt'
+      - 'requirements.in'
       - '.github/workflows/code-quality.yml'
   push:
     branches:
@@ -17,6 +18,7 @@ on:
       - 'pyproject.toml'
       - 'requirements-dev.txt'
       - 'requirements.txt'
+      - 'requirements.in'
 
 jobs:
   pre-commit:
