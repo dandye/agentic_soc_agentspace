@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 0 * * *' # Runs daily at midnight
   workflow_dispatch: # Allows manual triggering
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # Runs on PRs to any branch
 
 jobs:
   update-dependencies:
@@ -37,8 +40,22 @@ jobs:
         run: |
           git diff --quiet requirements.in || echo "req_in_changed=true" >> $GITHUB_OUTPUT
 
+      - name: Display dependency update status (PR context)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "### Dependency Update Check"
+          if [[ "${{ steps.check_changes.outputs.req_in_changed }}" == "true" ]]; then
+            echo "Changes detected in requirements.in:"
+            git diff requirements.in
+            echo ""
+            echo "Updated requirements.txt:"
+            git diff requirements.txt
+          else
+            echo "No dependency updates needed."
+          fi
+
       - name: Setup Git and Create Pull Request
-        if: steps.check_changes.outputs.req_in_changed == 'true'
+        if: steps.check_changes.outputs.req_in_changed == 'true' && github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
