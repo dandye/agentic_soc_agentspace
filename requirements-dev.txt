@@ -7,4 +7,4 @@ pytest
 pytest-cov
 ruff
 pip-tools
-pip-upgrade
+pur
