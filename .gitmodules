@@ -7,4 +7,4 @@
 	url = https://github.com/dandye/ai-runbooks.git
 [submodule "adk_runbooks"]
 	path = adk_runbooks
-	url = https://github.com/adk_runbooks.git
+	url = https://github.com/dandye/adk_runbooks.git
