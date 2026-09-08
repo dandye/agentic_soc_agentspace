@@ -158,6 +158,14 @@ class TestSecurityAnalyticsMath:
         assert best_candidate["key"] == 0x5A
         assert "https://apt29-c2.evil-domain.com/beacon" in best_candidate["decoded_strings"]
 
+    @pytest.mark.skip(
+        reason=(
+            "Spawns '/bin/bash .../untrusted_payload.sh' from a temporary directory, "
+            "triggering corporate endpoint detection alarms (e.g. 'curl | bash' or suspicious "
+            "script detonation in /tmp). Detonation tests should run inside containerized or "
+            "remote Vertex AI Reasoning Engine sandboxes, not on bare workstation/cloudtop hosts."
+        )
+    )
     def test_detonate_and_capture_forensics_bash_dropper(self, tmp_path):
         simulated_dropper = """#!/bin/bash
 mkdir -p subfolder
@@ -208,6 +216,13 @@ curl -s --connect-timeout 1 http://169.254.169.254/computeMetadata/v1/ || echo "
         assert clean_audit["is_sandboxed"] is True
         assert "ZERO-TRUST" in clean_audit["verdict"]
 
+    @pytest.mark.skip(
+        reason=(
+            "Spawns bash subprocesses executing simulated dropper payloads on the local host. "
+            "To prevent corporate endpoint detection alarms on workstations/cloudtops, payload detonation "
+            "tests must only run within containerized or remote Vertex AI Reasoning Engine sandboxes."
+        )
+    )
     def test_detonate_symlink_containment(self, tmp_path):
         # Dropper attempts symlink traversal attack to host files
         symlink_dropper = """#!/bin/bash
@@ -227,6 +242,13 @@ echo "ATTACK_SUCCESS" > ./local_payload.bin
         assert symlink_artifacts[0]["preview"] == "<symlink -> /etc/passwd>"
         assert symlink_artifacts[0]["sha256"] == "symlink_unresolved"
 
+    @pytest.mark.skip(
+        reason=(
+            "Spawns bash subprocesses executing simulated dropper payloads on the local host. "
+            "To prevent corporate endpoint detection alarms on workstations/cloudtops, payload detonation "
+            "tests must only run within containerized or remote Vertex AI Reasoning Engine sandboxes."
+        )
+    )
     def test_detonate_detects_modified_files(self, tmp_path):
         # Pre-seed a baseline file
         target_file = tmp_path / "important_data.txt"

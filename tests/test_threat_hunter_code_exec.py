@@ -88,6 +88,14 @@ print(f"YARA_MATCH:{yara_res['matches']}")
         assert "YARA_VALID:True" in res.stdout
         assert "YARA_MATCH:True" in res.stdout
 
+    @pytest.mark.skip(
+        reason=(
+            "Spawns '/bin/bash .../untrusted_payload.sh' on the local host from /tmp, "
+            "triggering corporate endpoint detection alarms (e.g. 'curl | bash' or suspicious "
+            "script detonation in /tmp). Detonation tests must execute within containerized or "
+            "remote Vertex AI Reasoning Engine sandboxes, not on bare workstation/cloudtop hosts."
+        )
+    )
     def test_threat_hunter_sandboxed_dropper_detonation(self):
         from google.adk.code_executors import UnsafeLocalCodeExecutor
         from google.adk.code_executors.code_execution_utils import CodeExecutionInput
